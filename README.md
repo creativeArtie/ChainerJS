@@ -88,4 +88,4 @@ This tells the ChainerJS what to do when it is reloading or loading the html fil
   * It comes functions to edit the element where the attribute is found.
 
 ##Project goals
-I have no idea when I will be around updating the script and unless I get pay to continue, I might not be able work on this project long-term. I hope funding for ChainerJS is possible since AngularJS is able secure money from Google...(I am not saying ChainerJS is better then AngularJS!)
+I have no idea when I will be around updating the script and unless I get pay to continue, I might not be able work on this project long-term.
