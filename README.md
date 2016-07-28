@@ -1,6 +1,8 @@
 # ChainerJS
 ##Overview:
-ChainerJS is a Javascript MVP framework. The framework is currently is in working alpha but many of its functionarities are not implmented and have not been test thoroughly. The article below show what I have desgined and some of it is not implemented. 
+ChainerJS is a Javascript MVP framework. The framework is currently is in working alpha but many of its functionarities are not implmented and have not been test thoroughly. The article below show what I have desgined and some of it is not implemented.
+
+ChainerJS requires [JQuery](https://jquery.com/).
 ###Why Use ChainerJS?
 * *ChainerJS probably has fast preformance*  
   The changes to the model this framework are very explicit, therefore it know when the models are being updated and never need to use do any dirty checking like AngularJS.
