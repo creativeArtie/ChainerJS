@@ -1,3 +1,4 @@
+QUnit.module("Model Names");
 QUnit.test( "Start Error", function( assert ) {
   assert.throws( function(){
     chainer.models(".abc", function(){})
