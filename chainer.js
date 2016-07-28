@@ -127,7 +127,8 @@ var chainer = function (){
             }
         }
       } else {
-        throwError("Field not found: " + id);
+        console.log(models);
+        throwError("Namespace not found: " + id);
       }
     }
     return {ns: ns, field: field};
@@ -406,10 +407,9 @@ var chainer = function (){
         if (view.type == 3){
           var modifier = {context: generator.context, run: view.run, 
             $cur: generator.$cur, data: attrVal};
-          runModifier(modifier, false);
+          return runModifier(modifier, false);
         }
       }
-      return this;
     }
     api['generator'] = function(tag, category, data){
       if (rawViews.hasOwnProperty(tag)){
@@ -446,6 +446,7 @@ var chainer = function (){
     viewBasicAPI(input, modifier.context, api);
     elementBasicAPI(modifier.$cur, api)
     modifier.run.call(modifier.context, api);
+    return this;
   }
   
   //PART 2.4 Common API functions ==============================================
@@ -495,7 +496,7 @@ var chainer = function (){
       $cur.slideUp(time);
     }
     api['slideDown'] = function(time){
-      $cur.slideUp(time);
+      $cur.slideDown(time);
     }
     //events
     api['click'] = function(updater){
@@ -541,7 +542,6 @@ var chainer = function (){
         updater.call(context, input);
       }
     }
-    return api;
   }
   //PART 3: Common Functions ===================================================
   //Call function with a context that has a parent context
@@ -565,7 +565,7 @@ var chainer = function (){
   function reload(){
     //Calls all init functions
     for(var f in inits){
-      inits[f](elementBasicAPI($("body")));
+      inits[f](elementBasicAPI($("body"), commonBasicAPI({})));
     }
     //Clear all views listeners
     for (ns in models){
@@ -586,13 +586,14 @@ var chainer = function (){
 
   //Method to call when all files are loaded
   $(document).ready(function(){
-    //Calls all init functions
-    for(var f in inits){
-      inits[f](elementBasicAPI($("body"), commonBasicAPI({})));
-    }
     //builds the models
     for(var r in rawModels){
       buildRunModel(r, rawModels[r]);
+    }
+    
+    //Calls all init functions
+    for(var f in inits){
+      inits[f](elementBasicAPI($("body"), commonBasicAPI({})));
     }
     
     load();
