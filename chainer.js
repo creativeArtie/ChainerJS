@@ -118,22 +118,16 @@ var chainer = function (){
         switch (type){
           case 1:
             if (!models[ns].write.hasOwnProperty(field)){
-              var error = Error("Field not found: " + id);
-              console.log(error);
-              throw error;
+              throwError("Field not found: " + id);
             }
             break;
           case 2:
             if (!models[ns].read.hasOwnProperty(field)){
-              var error = Error("Field not found: " + id);
-              console.log(error);
-              throw error;
+              throwError("Field not found: " + id);
             }
         }
       } else {
-        var error = Error("Field not found: " + id);
-        console.log(error);
-        throw error;
+        throwError("Field not found: " + id);
       }
     }
     return {ns: ns, field: field};
@@ -170,9 +164,7 @@ var chainer = function (){
             if (prep == null){
               prep = func;
             } else {
-              var error = new Error("Prep function is already set.");
-              console.error(error);
-              throw error;
+              throwError("Prep function is already set.");
             }
             return this;
           };
@@ -182,9 +174,7 @@ var chainer = function (){
             if (post == null){
               post = func;
             } else {
-              var error = new Error("Ready function is already set.");
-              console.error(error);
-              throw error;
+              throwError("Ready function is already set.");
             }
               return this;
           };
@@ -201,9 +191,7 @@ var chainer = function (){
               path = checkPath(model.value);
               return this;
             }
-            var error = new Error("Field not found: " + ns + "." + field);
-            console.error(error);
-            throw error;
+            throwError("Field not found: " + ns + "." + field);
           };
           //Parse the attribute value as a URL path
           api['pathFromHTML'] = function(){
@@ -226,9 +214,7 @@ var chainer = function (){
           if (path != null){
             //Step 4.1: setup the loading
             if (path == ""){
-              var error = new Error("Path is empty.")
-              console.error(error);
-              throw error;
+              throwError("Path is empty.");
             }
             var deferred = $.Deferred();
             $(this).load(path, function(){
@@ -258,9 +244,7 @@ var chainer = function (){
     //TODO check if the data dosen't needs "[]"
     var raw = $.parseJSON("[" + data + "]");
     if (raw.length < 1){
-      var error = new Error("Not enough data: " + data);
-      console.error(error);
-      throw error;
+      throwError("Not enough data: " + data);
     }
     var category = raw.shift();
     
@@ -671,18 +655,14 @@ var chainer = function (){
     if ($.isNumeric(value)){ 
       return value;
     }
-    var error = new Error("Not a number: " + value);
-    console.error(error);
-    throw error;
+    throwError("Not a number: " + value);
   }
   
   function checkFunction(value){
     if ($.isFunction(value)){
       return value;
     }
-    var error = new Error("Not a function: " + value);
-    console.error(error);
-    throw error;
+    throwError("Not a function: " + value);
   }
   
   function checkPath(value){
@@ -690,68 +670,43 @@ var chainer = function (){
     if (typeof value === 'string'){
       return value;
     }
-    var error = new Error("Not a path: " + value);
-    console.error(error);
-    throw error;
+    throwError("Not a path: " + value);
   }
   
   function checkObject(value){
     if (typeof value == 'object'){
       return value;
     }
-    var error = new Error("Not an object: " + value);
-    console.error(error);
-    throw error;
+    throwError("Not an object: " + value);
   }
 
   function checkArray(value){
     if ($.isArray(value)){
       return value;
     }
-    var error = new Error("Not an array: " + value);
-    console.error(error);
-    throw error;
-  }
-
-  function checkName(value){
-    if (/^[0-9a-zA-Z]+(\.[0-9a-zA-Z]+)*$/.test(value)){
-      return value;
-    } else if (! value && typeof value == 'string') {
-      return value;
-    }
-    var error = new Error("Name string pattern is wrong: " + value);
-    console.error(error);
-    throw error;
+    throwError("Not an array: " + value);
   }
   
-  function checkMainNS(ns, checkUsed = false){
+  function checkNS(ns, checkUsed = false){
     if (! /^[0-9a-zA-Z]+(\.[0-9a-zA-Z]+)*$/.test(ns)){
-      var error = new Error("Namespace string pattern is wrong: " + ns);
-      console.error(error);
-      throw error;
+      throwError("Namespace string pattern is wrong: " + ns);
     }
     if (checkUsed){
       if (rawModels.hasOwnProperty(ns)){
-        var error = new Error("Model with this namespace is in use: " + ns);
-        console.error(error);
-        throw error;
+        throwError("Model with this namespace is in use: " + ns);
       }
     }
     return ns;
   }
 
-  function checkMainTag(tag, checkUsed = false){
+  function checkTag(tag, checkUsed = false){
     if (! /^[0-9a-z]+(\-[0-9a-z]+)*$/.test(tag)){
-      var error = new Error("Tag string pattern is wrong: " + tag);
-      console.error(error);
-      throw error;
+      throwError("Tag string pattern is wrong: " + tag);
     }
     if (checkUsed){
       for(var u in rawViews){
         if (tag == u){
-          var error = new Error("Tag is already in use: " + tag);
-          console.error(error);
-          throw error;
+          throwError("Tag is already in use: " + tag);
         }
       }
     }
@@ -764,7 +719,11 @@ var chainer = function (){
     }  else if (! value && typeof value === 'string'){
       return value;
     }
-    var error = new Error("category string prattern is wrong: " + value);
+    throwError("category string prattern is wrong: " + value);
+  }
+  
+  function throwError(msg){
+    var error = new Error(msg);
     console.error(error);
     throw error;
   }
@@ -808,13 +767,13 @@ var chainer = function (){
     //TODO is it better load as soon as the file is being load?
     'model': function(ns, init){
       //Creates a model to use in modifiers, models, and system 
-      rawModels[checkMainNS(ns, true)] = checkFunction(init);
+      rawModels[checkNS(ns, true)] = checkFunction(init);
       return this;
     },
     //Creates a loader but store it for now
     'loader': function(tag, init){
       //Sets up the html by loading files
-      rawViews[checkMainTag(tag, true)] = {
+      rawViews[checkTag(tag, true)] = {
         init: checkFunction(init),
         type: 1
       }
@@ -823,7 +782,7 @@ var chainer = function (){
     //Creates a generator but store it for now
     'generator': function(tag, category, init, run){
       //Modifies an element from either base model or from generator
-      rawViews[checkMainTag(tag, true)] = {
+      rawViews[checkTag(tag, true)] = {
         init: checkFunction(init),
         category: checkCategory(category),
         run: checkFunction(run),
@@ -834,7 +793,7 @@ var chainer = function (){
     //Creates a modifier but store it for now
     'modifier': function(tag, run){
       //Modifies an element from either base models or from generator
-      rawViews[checkMainTag(tag, true)] = {
+      rawViews[checkTag(tag, true)] = {
         run: checkFunction(run),
         type: 3
       }
