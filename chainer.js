@@ -90,7 +90,7 @@ var chainer = function (){
       models[ns].read[field].refer = {context: context, func: updater};
     };
     //Gets the shared data without the needs to listen to it.
-    api['get'] = function(id, value){
+    api['use'] = function(id, value){
       var setup = parseID(id);
       return models[setup.ns].share[setup.field].value;
     };
@@ -127,7 +127,6 @@ var chainer = function (){
             }
         }
       } else {
-        console.log(models);
         throwError("Namespace not found: " + id);
       }
     }
@@ -258,74 +257,74 @@ var chainer = function (){
   function buildGenerator(tag, init, $cur, data, context = {}, children){
     //Step 1: setup the list of things needed for api
     var rawChildren = {};
+    var virtual = undefined;
     var id = null;
     
     //Step 2: setup the api and call it
     var api = {};
-    if (children){//virtual dom found!
-      //Find the direct children of the virtual dom
-      api['children'] = function(subCategory, subInit){
-        //check parameters
-        checkCategory(subCategory);
-        checkFunction(subInit);
+
+    //Find the direct children in the html file
+    api['children'] = function(subCategory, subInit){
+      //check parameters
+      checkCategory(subCategory);
+      checkFunction(subInit);
+      
+      //setup
+      rawChildren[subCategory] = [];
+      $(">[data-" + tag + "]", $cur).each(function(){
+        var setup = buildData($(this).data(tag));
+        if (subCategory == setup.category){
+          rawChildren[subCategory].push( 
+            {$cur: $(this), init: subInit, data: setup.data});
+        }
+      });
+    };
+    //Find the view with the same id as this one
+    //TODO attempts to conntent with virtual views too
+    api['find'] = function(subCategory, subInit){
+      //check parameters
+      checkCategory(subCategory);
+      checkFunction(subInit);
+      
+      //setup
+      rawChildren[subCategory] = [];
+      id = id == null? (data.length > 0? data.shift(): ""): id;
+      $("[data-" + tag + "*=\"" + subCategory + "\"]").each(function(){
+        //child id setup
+        var setup = buildData($(this).data(tag));
+        var refer = setup.data.shift();
         
-        //setup
-        rawChildren[subCategory] = [];
-        for(var c in children.children){
-          var child = children.children[c];
-          for(var a in child.attrs){
-            var attr = child.attrs[a];
-            if (attr.tag == tag && attr.category == subCategory){
-              //All checking is done and pass
-              rawChildren[subCategory].push(
-                {$cur: child.$cur, init: subInit, data: attr.data}
-              );
-            }
+        if (subCategory == setup.category && id == refer){
+          rawChildren[subCategory].push( 
+            {$cur: $(this), init: subInit, data: setup.data});
+        }
+      });
+    };
+    
+    api['expand'] = function(ns, id){
+      if (virtual == null){
+        virtual = {};
+      }
+      id = parseID(id);
+      function update(values){
+        if (! virtual.hasOwnProperty(ns)){
+          virtual[ns] = {};
+        }
+        for (var v in values){
+          virtual[ns][v] = values[v];
+        }
+        for(var v in virtual[ns]){
+          if (! values.hasOwnProperty(v)){
+            delete virtual[ns][v];
           }
         }
       }
-      //TODO create api['find']
-      //TODO attempt to connect with other establish views
-      
-    } else {//Use actual DOM
-      //Find the direct children in the html file
-      api['children'] = function(subCategory, subInit){
-        //check parameters
-        checkCategory(subCategory);
-        checkFunction(subInit);
-        
-        //setup
-        rawChildren[subCategory] = [];
-        $(">[data-" + tag + "]", $cur).each(function(){
-          var setup = buildData($(this).data(tag));
-          if (subCategory == setup.category){
-            rawChildren[subCategory].push( 
-              {$cur: $(this), init: subInit, data: setup.data});
-          }
-        });
-      };
-      //Find the view with the same id as this one
-      //TODO attempts to conntent with virtual views too
-      api['find'] = function(subCategory, subInit){
-        //check parameters
-        checkCategory(subCategory);
-        checkFunction(subInit);
-        
-        //setup
-        rawChildren[subCategory] = [];
-        id = id == null? (data.length > 0? data.shift(): ""): id;
-        $("[data-" + tag + "*=\"" + subCategory + "\"]").each(function(){
-          //child id setup
-          var setup = buildData($(this).data(tag));
-          var refer = setup.data.shift();
-          
-          if (subCategory == setup.category && id == refer){
-            rawChildren[subCategory].push( 
-              {$cur: $(this), init: subInit, data: setup.data});
-          }
-        });
-      };
-    }
+      update(models[id.ns].write[id.field].value);
+      models[id.ns].write[id.field].refers.push({
+        context: context, func: update
+      })
+      return this;
+      }
     //Return the next value in the array or the defaulted if not found.
     api['data'] = function(defaulted){
       if (data.length > 0){
@@ -355,7 +354,7 @@ var chainer = function (){
         }
       }
     }
-    return {$cur: $cur, context: context, children: children}
+    return {$cur: $cur, context: context, children: children, virtual: virtual}
   }
   
   //Runs a generator 
@@ -367,7 +366,7 @@ var chainer = function (){
     var api = {};
     //edits the children in the subRun
     //API GROUP 1: edit the view children and create attributes
-    api['children'] = function(subCategory, subRun){
+    api['edit'] = function(subCategory, subRun){
       for(var c in generator.children[subCategory]){
         var child = generator.children[subCategory][c];
         callFunction(
@@ -378,7 +377,14 @@ var chainer = function (){
     //Create a virtual view attribute
     //TODO maybe not allow this at the top level.
     api['genData'] = function(tag, category, data){
-      newChildren.attrs.push({tag: tag, category: category, data: data});
+      var output = "\"" + category + "\",";
+      for (var d in data){
+        output += typeof data[d] == "string"? "\"" + data[d] + "\"": data[d];
+        if (d != data.length -1 ){
+         output += ",";
+        }
+      }
+      generator.$cur.attr("data-" + tag, output);
     }
     //API GROUP 2: edit the children in the HTML using basic tags
     //clear out the child elements
@@ -402,21 +408,23 @@ var chainer = function (){
     //TODO more HTML DOM editing
     //API GROUP 3: edit the children in the HTML using views 
     api['modifier'] = function(tag, attrVal){
+      generator.$cur.attr("data-" + tag, attrVal);
       if (rawViews.hasOwnProperty(tag)){
         var view = rawViews[tag];
         if (view.type == 3){
           var modifier = {context: generator.context, run: view.run, 
-            $cur: generator.$cur, data: attrVal};
-          return runModifier(modifier, false);
+            $cur: generator.$cur, data:attrVal};
+          return runModifier(modifier);
         }
       }
     }
     api['generator'] = function(tag, category, data){
+      this.genData(tag, category, data);
       if (rawViews.hasOwnProperty(tag)){
         var view = rawViews[tag];
         if (view.type == 2){
           var gen = buildGenerator(tag, view.init, generator.$cur, data,
-            generator.context, newChildren);
+            generator.context);
           var run = view.run;
           runGenerator(gen, run);
         }
@@ -432,7 +440,7 @@ var chainer = function (){
   }
   
   var modifiers = [];
-  function runModifier(modifier, isMain = true){
+  function runModifier(modifier){
     //context:{}, run: rawViews[tag].run, $cur: $(this), data: ??
     
     //Edits the element
@@ -442,8 +450,7 @@ var chainer = function (){
       return modifier.data;
     };
     //other api
-    var input = isMain? modifier.$cur: modifier.data;
-    viewBasicAPI(input, modifier.context, api);
+    viewBasicAPI(modifier.$cur, modifier.context, api);
     elementBasicAPI(modifier.$cur, api)
     modifier.run.call(modifier.context, api);
     return this;
@@ -452,62 +459,8 @@ var chainer = function (){
   //PART 2.4 Common API functions ==============================================
   //edits the element
   function elementBasicAPI($cur, api){
-    //text editing
-    api['html'] = function(value){
-      $cur.html(value);
-      return api;
-    };
-    //styles editing
-    api['addClass'] = function(value){
-      $cur.addClass(value);
-      return api;
-    };
-    api['removeClass'] = function(value){
-      $cur.removeClass(value);
-      return api;
-    };
-    api['css'] = function(arg0, arg1){
-      if (arg1 == null){
-        $cur.css(arg0);
-      } else {
-        $cur.css(arg0, arg1);
-      }
-      return api;
-    };
-    //animation
-    api['show'] = function(){
-      $cur.show();
-    }
-    api['hide'] = function(){
-      $cur.hide();
-      return api;
-    };
-    api['toggle'] = function(){
-      $cur.toggle();
-      return api;
-    };
-    api['fadeIn'] = function(time){
-      $cur.fadeIn(time);
-    }
-    api['fadeOut'] = function(time){
-      $cur.fadeOut(time);
-    }
-    api['slideUp'] = function(time){
-      $cur.slideUp(time);
-    }
-    api['slideDown'] = function(time){
-      $cur.slideDown(time);
-    }
-    //events
-    api['click'] = function(updater){
-      $cur.click(updater);
-    }
-    //input options
-    api['enable'] = function(){
-      $cur.prop('disabled', false)
-    }
-    api['disable'] = function(){
-      $cur.prop('disabled', true);
+    api['get'] = function(){
+      return ($cur.get());
     }
     //TODO a lot more element editing API
     return api;
@@ -524,23 +477,33 @@ var chainer = function (){
   }
   
   //have a view listen to a model write field only system has no access to this
-  function viewBasicAPI(input, context, api){
-    commonBasicAPI(api);
-    if (input instanceof jQuery){
-      //the requesting view is base on dom or serve
+  function viewBasicAPI($cur, context, api, virtual){
+    if (virtual){
+      //the requesting view is base on virtual dom
       api['recieve'] = function(id, updater){
         var setup = parseID(id, 1);
-        models[setup.ns].write[setup.field].refers.push({
-          $cur: input, context: context, func: updater, type: 3
+        virtual[setup.ns].write[setup.field].refers.push({
+          $cur: $cur, context: context, func: updater, type: 3
         })
         var value = models[setup.ns].write[setup.field].value;
         updater.call(context, value);
       }
+      api['update'] = function(id, value){
+        var setup = parseID(id, 2);
+        var target = virtual[setup.ns].read[setup.field].refer;
+        target.func.call(target.context, value);
+      };
     } else {
-      //the requesting view is base on virtual dom
+      //the requesting view is base on dom or serve
       api['recieve'] = function(id, updater){
-        updater.call(context, input);
+        var setup = parseID(id, 1);
+        models[setup.ns].write[setup.field].refers.push({
+          $cur: $cur, context: context, func: updater, type: 3
+        })
+        var value = models[setup.ns].write[setup.field].value;
+        updater.call(context, value);
       }
+      commonBasicAPI(api);
     }
   }
   //PART 3: Common Functions ===================================================
@@ -848,14 +811,14 @@ chainer.generator("std-collapse", "heading", function(init){
   this.collapse = init.data(false);
 }, function(run){
   if(this.collapse){
-    run.children("panel", function(child){
-      child.hide();
+    run.edit("panel", function(child){
+      $(child.get()).hide();
     });
   }
   this.run = run;
-  run.click(function(){
-    run.children("panel", function(child){
-      child.toggle();
+  $(run.get()).click(function(){
+    run.edit("panel", function(child){
+      $(child.get()).toggle();
     });
   })
 });
@@ -869,29 +832,31 @@ chainer.generator("std-grid", "row", function(init){
   this.cols = init.data(1);
   this.mobile = init.data("") == "mobile";
 }, function(run){
-  run.children("col", function(edit){
+  run.edit("col", function(edit){
+    var $edit = $(edit.get());
     edit.recieve("std.media", function(refer){
       var width = "96%";
       if (refer() != 'sm' || this.mobile){
         width = ((100 / this.cols) * this.span) - 2 + "%";
       }
-      edit.css("width", width);
+      $edit.css("width", width);
     })
-    edit.css("float", "left").css("min-heigth", "1px")
+    $edit.css("float", "left").css("min-heigth", "1px")
       .css("box-sizing", "border-box").css("margin", "0 1%");
   })
-  run.append("br").css("clear", "both");
+  $(run.append("br").get()).css("clear", "both");
 });
 
 //creates a mobile sensitive modifier
 chainer.modifier("std-class", function(run){
+  var $run = $(run.get());
   run.recieve("std.media", function(refer){
     var object = run.attr();
     for(var c in object){
       if (refer(object[c])){
-        run.addClass(c);
+        $run.addClass(c);
       }else {
-        run.removeClass(c);
+        $run.removeClass(c);
       }
     }
   })
@@ -900,7 +865,7 @@ chainer.modifier("std-class", function(run){
 //creates a modifier that read from the model
 chainer.modifier("std-write", function(init){
   init.recieve(init.attr(), function(refer){
-    init.html(refer);
+    $(init.get()).html(refer);
   });
 })
 
@@ -913,17 +878,18 @@ chainer.modifier("std-click", function(init){
   var enable = data.shift(); //check if the button is enable or not
   var arg = data.length > 0? data.shift() : null; //arguments for the call
   
+  var $init = $(init.get());
   //set enabled
-  init.recieve(enable, function(refer){
-    if (refer){
-      init.enable();
-    } else {
-      init.disable();
-    }
-  });
+  if (typeof enable == "boolean"){
+    $init.prop("disabled", enable);
+  } else {
+    init.recieve(enable, function(refer){
+      $init.prop("disabled", refer);
+    });
+  }
   
   //set click function
-  init.click(function(){
+  $init.click(function(){
     init.update(calls, arg);
   })
 })
