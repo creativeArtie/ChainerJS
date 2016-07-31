@@ -2,7 +2,7 @@
 ##Overview:
 ChainerJS is a Javascript MVP framework. The framework is currently is in working alpha but many of its functionarities are not implmented and have not been test thoroughly. The article below show what I have desgined and some of it is not implemented.
 
-ChainerJS requires [JQuery](https://jquery.com/).
+ChainerJS requires [JQuery](https://jquery.com/), but there will be a milestone to stop depending on it.
 ###Why Use ChainerJS?
 * *ChainerJS probably has fast preformance*  
   The changes to the model this framework are very explicit, therefore it know when the models are being updated and never need to use do any dirty checking like AngularJS.
@@ -35,7 +35,7 @@ Where:
   * `modifier` (edits the elements)
   * `model` (defines and edits the model)
   * `system` (sets prepation and ready function)
-* api holds the function to work with the model or a presenter, you can replace the word `api` with any javascript accept-able variable name
+* api holds the function to work with the model or a presenter, you can replace the word `api` with any javascript accept-able variable name. It fact, it is often better to use a different name so you can use the api inside the inner function.
 * doSomething is a function provided by the api. It return itself if no other data is needed.
 * the function with the api as parameter is call the parent function to the nested function
 * the function with the api1 as a parameter is call the child function 
@@ -57,7 +57,7 @@ This is a presenter that should be use the least as it will force the most of th
 * `ready(func)` calls func after loading is completed.
 * `pathFromModel()`, `pathFromScript(value)`, `pathFromHTML()` shows where to look for a path
 * `update(id, value)` inform a model that one of its field has been updated.
-* It comes functions to edit the element where the attribute is found.
+* `get()` gets the underlining HTML tag. In the future, this HTML taga can be deleted.
 
 ##Generator
 This is the most complex presenter due its abilty to produce more presenters. It has three parameters: a unique `data-*` attribute, generator category, and a run function. The attribute have this pattern `/^[0-9a-z]+(\-[0-9a-z]+)*$/`. The category uses `/[0-9a-zA-Z_]+/` pattern. Each generator attribute value is an array starts with a category. The generators only picks the tag with the same category.
@@ -68,8 +68,9 @@ The init function has the following function.
 * `data(defaulted)` gets the next value in generator data list.
 * `generator(tag, category, data)` add a generator attribute and call if possible
 * `modifier(tag, data)` add a modifier attriubte and call it.
+* `model(tag, id, func)` create a generator with a localized model based on an object from the main model data.
 * `update(id, value)` inform a model that one of its field has been updated.
-* It comes functions to edit the element where the attribute is found.
+* `get()` gets the underlining HTML tag. In the future, this HTML taga can be deleted.
 
 Child init and run function calls recusively with the same functions.
 
@@ -77,7 +78,7 @@ Child init and run function calls recusively with the same functions.
 This is a simple presenter with two parameters: a unique tag name and run function. It comes with these functions
 * `attr` gets the data from either it's `data-*` attribute or from virtual attribute
 * `update(id, value)` inform a model that one of its field has been updated.
-* It comes functions to edit the element where the attribute is found.
+* `get()` gets the underlining HTML tag. In the future, this HTML taga can be deleted.
 
 ##System
 This tells the ChainerJS what to do when it is reloading or loading the html files. It comes with these functions
