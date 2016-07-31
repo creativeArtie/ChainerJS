@@ -5,7 +5,7 @@ var chainer = function (){
   //PART 1: Models==============================================================
   var models = {};// A group main models 
   
-  //Builds and run the a rawModels of type = 0 (Model)
+  //Builds and run the a rawModels of model
   //ns is the namespace of the model, which acts like a class in java
   //init is from the programmer using this framework
   function buildRunModel(ns, init){
@@ -242,7 +242,9 @@ var chainer = function (){
   //Create a data array and return the category and data
   function buildData(data){
     //TODO check if the data dosen't needs "[]"
-    var raw = $.parseJSON("[" + data + "]");
+    if (! $.isArray(data)){
+      var raw = JSON.parse("[" + data + "]");
+    }
     if (raw.length < 1){
       throwError("Not enough data: " + data);
     }
@@ -254,194 +256,112 @@ var chainer = function (){
   
   //Builds the generator Calls by child init generators, virtual create or by
   //the main functions
-  function buildGenerator(tag, init, $cur, data, context = {}, children){
-    //Step 1: setup the list of things needed for api
-    var rawChildren = {};
-    var virtual = undefined;
-    var id = null;
-    
-    //Step 2: setup the api and call it
+  function runGenerator(generator){
+    //context, run, $cur, tag, data, model
     var api = {};
-
-    //Find the direct children in the html file
-    api['children'] = function(subCategory, subInit){
-      //check parameters
-      checkCategory(subCategory);
-      checkFunction(subInit);
-      
-      //setup
-      rawChildren[subCategory] = [];
-      $(">[data-" + tag + "]", $cur).each(function(){
-        var setup = buildData($(this).data(tag));
-        if (subCategory == setup.category){
-          rawChildren[subCategory].push( 
-            {$cur: $(this), init: subInit, data: setup.data});
+    api['children'] = function(category, run){
+      $(">[data-" + generator.tag + "]", generator.$cur).each(function(){
+        var data = buildData($(this).data(generator.tag));
+        if (data.category == category){
+          var child = {context: generator.context, run, $cur: $(this), 
+            tag: generator.tag, data: data.data};
+          runGenerator(child);
         }
       });
-    };
-    //Find the view with the same id as this one
-    //TODO attempts to conntent with virtual views too
-    api['find'] = function(subCategory, subInit){
-      //check parameters
-      checkCategory(subCategory);
-      checkFunction(subInit);
-      
-      //setup
-      rawChildren[subCategory] = [];
-      id = id == null? (data.length > 0? data.shift(): ""): id;
-      $("[data-" + tag + "*=\"" + subCategory + "\"]").each(function(){
-        //child id setup
-        var setup = buildData($(this).data(tag));
-        var refer = setup.data.shift();
-        
-        if (subCategory == setup.category && id == refer){
-          rawChildren[subCategory].push( 
-            {$cur: $(this), init: subInit, data: setup.data});
+    }
+    var target = generator.target? generator.target: null;
+    api['find'] = function(category, run){
+      if (! target){
+        if (generator.data.length > 0){
+          target = generator.data.shift();
+        } else {
+          throwError("target not found");
         }
-      });
-    };
-    
-    api['expand'] = function(ns, id){
-      if (virtual == null){
-        virtual = {};
       }
-      id = parseID(id);
-      function update(values){
-        if (! virtual.hasOwnProperty(ns)){
-          virtual[ns] = {};
-        }
-        for (var v in values){
-          virtual[ns][v] = values[v];
-        }
-        for(var v in virtual[ns]){
-          if (! values.hasOwnProperty(v)){
-            delete virtual[ns][v];
+      $("[data-" + generator.tag + "]").each(function(){
+        var data = buildData($(this).data(generator.tag));
+        if (data.category == category){
+          data.target = data.data.length > 0? data.data.shift(): null;
+          if (data.target && data.target == target){
+            var child = {context: generator.context, run, $cur: $(this), 
+              tag: generator.tag, data: data.data, target: data.target};
+            runGenerator(child);
           }
         }
-      }
-      update(models[id.ns].write[id.field].value);
-      models[id.ns].write[id.field].refers.push({
-        context: context, func: update
       })
-      return this;
-      }
-    //Return the next value in the array or the defaulted if not found.
+    }
     api['data'] = function(defaulted){
-      if (data.length > 0){
-        return data.shift();
-      } else {
-        return defaulted;
+      if (generator.data.length > 0){
+        return generator.data.shift();
       }
-    };
-    //TODO create a model but only has read/write fields
-    init.call(context, api);
-    
-    //create the children
-    var children = {};
-    for(var s in rawChildren){
-      children[s] = [];
-      for (var c in rawChildren[s]){
-        var subContext = {};
-        for(var d in context){
-          subContext[d] = context[d];
-        }
-        var raw = rawChildren[s][c];
-        children[s].push(buildGenerator(tag, raw.init, raw.$cur, raw.data, 
-          subContext));
-        
-        for(d in context){
-          context[d] = subContext[d];
-        }
-      }
+      return defaulted;
     }
-    return {$cur: $cur, context: context, children: children, virtual: virtual}
-  }
-  
-  //Runs a generator 
-  function runGenerator(generator, run){
-    //generator: {$cur: jQuery, context: {}, children: generator}
-    //creating virtual dom.
-    var newChildren = {children: [], attrs: []};
-    
-    var api = {};
-    //edits the children in the subRun
-    //API GROUP 1: edit the view children and create attributes
-    api['edit'] = function(subCategory, subRun){
-      for(var c in generator.children[subCategory]){
-        var child = generator.children[subCategory][c];
-        callFunction(
-          child.context, generator.context, runGenerator, [child, subRun]);
-      }
-      return this;
-    };
-    //Create a virtual view attribute
-    //TODO maybe not allow this at the top level.
-    api['genData'] = function(tag, category, data){
-      var output = "\"" + category + "\",";
-      for (var d in data){
-        output += typeof data[d] == "string"? "\"" + data[d] + "\"": data[d];
-        if (d != data.length -1 ){
-         output += ",";
-        }
-      }
-      generator.$cur.attr("data-" + tag, output);
+    api['append'] = function(tag, run){
+      var $child = $("<" + tag + ">");
+      generator.$cur.append($child);
+      var child = {context: generator.context, run: run, $cur: $child, 
+        tag: generator.tag,data: [], model: generator.model};
+      runGenerator(child);
     }
-    //API GROUP 2: edit the children in the HTML using basic tags
-    //clear out the child elements
-    api['empty'] = function(){
-      generator.$cur.empty();
-      newChildren = {children: [], attrs: []};
-      return this;
-    }
-    //add after the last element
-    api['append'] = function(tag, func){
-      var $create = $("<" + tag + ">");
-      var api = {};
-      generator.$cur.append($create);
-      if (func){
-        var child = {$cur: $create, context: generator.context, 
-          children: generator.children}
-        newChildren.children.push(runGenerator(child, func));
-      }
-      return elementBasicAPI($create, api);
-    };
-    //TODO more HTML DOM editing
-    //API GROUP 3: edit the children in the HTML using views 
     api['modifier'] = function(tag, attrVal){
       generator.$cur.attr("data-" + tag, attrVal);
       if (rawViews.hasOwnProperty(tag)){
         var view = rawViews[tag];
         if (view.type == 3){
           var modifier = {context: generator.context, run: view.run, 
-            $cur: generator.$cur, data:attrVal};
+            $cur: generator.$cur, data:attrVal, model: generator.model};
           return runModifier(modifier);
         }
       }
     }
     api['generator'] = function(tag, category, data){
-      this.genData(tag, category, data);
+      generator.$cur.attr("data-" + tag, JSON.stringify(
+        data.unshift(category)));
       if (rawViews.hasOwnProperty(tag)){
         var view = rawViews[tag];
-        if (view.type == 2){
-          var gen = buildGenerator(tag, view.init, generator.$cur, data,
-            generator.context);
-          var run = view.run;
-          runGenerator(gen, run);
+        if (view.type == 2 && view.category == category){
+          var gen = {context: generator.context, run: view.run, 
+            $cur: generator.$cur, tag: generator.tag, data: data, 
+            model: generator.model}
+          runGenerator(gen);
         }
       }
     }
-    //API GROUP 4: other shared api
-    viewBasicAPI(generator.$cur, generator.context, api);
+    api['model'] = function(tag, id, func){
+      var local = {};
+      id = parseID(id, 1);
+      function run(value){
+        for(var v in value){
+          if (! local.hasOwnProperty(v)){
+            var $child = $("<" + tag + ">");
+            local[v] = {$child: $child};
+            generator.$cur.append($child);
+          } else {
+            var $child = local[v].$child;
+          }
+          var gen = {context: generator.context, run: func, $cur: $child,
+            tag: generator.tag, data: [], model: value[v]};
+          runGenerator(gen);
+        }
+        for(var v in local){
+          if (! value.hasOwnProperty(v)){
+            local[v].$child.remove();
+            delete local[v];
+          }
+        }
+      }
+      models[id.ns].write[id.field].refers.push({
+        $cur: generator.$cur, context: generator.context, func: run
+      });
+    }
+    viewBasicAPI(generator.$cur, generator.context, api, generator.model);
     elementBasicAPI(generator.$cur, api);
-    run.call(generator.context, api);
-    
-    return {children: newChildren.children, $cur: generator.$cur, 
-      attrs: newChildren.attrs}
+    generator.run.call(generator.context, api);
   }
   
   var modifiers = [];
   function runModifier(modifier){
-    //context:{}, run: rawViews[tag].run, $cur: $(this), data: ??
+    //context:{}, run: rawViews[tag].run, $cur: $(this), data: ??, model: {}
     
     //Edits the element
     var api = {};
@@ -450,7 +370,7 @@ var chainer = function (){
       return modifier.data;
     };
     //other api
-    viewBasicAPI(modifier.$cur, modifier.context, api);
+    viewBasicAPI(modifier.$cur, modifier.context, api, modifier.model);
     elementBasicAPI(modifier.$cur, api)
     modifier.run.call(modifier.context, api);
     return this;
@@ -462,7 +382,6 @@ var chainer = function (){
     api['get'] = function(){
       return ($cur.get());
     }
-    //TODO a lot more element editing API
     return api;
   }
   
@@ -481,16 +400,13 @@ var chainer = function (){
     if (virtual){
       //the requesting view is base on virtual dom
       api['recieve'] = function(id, updater){
-        var setup = parseID(id, 1);
-        virtual[setup.ns].write[setup.field].refers.push({
-          $cur: $cur, context: context, func: updater, type: 3
-        })
-        var value = models[setup.ns].write[setup.field].value;
-        updater.call(context, value);
+        if (virtual.hasOwnProperty(id)){
+          updater.call(context, virtual[id]);
+        }
       }
       api['update'] = function(id, value){
         var setup = parseID(id, 2);
-        var target = virtual[setup.ns].read[setup.field].refer;
+        var target = models[setup.ns].read[setup.field].refer;
         target.func.call(target.context, value);
       };
     } else {
@@ -498,7 +414,7 @@ var chainer = function (){
       api['recieve'] = function(id, updater){
         var setup = parseID(id, 1);
         models[setup.ns].write[setup.field].refers.push({
-          $cur: $cur, context: context, func: updater, type: 3
+          $cur: $cur, context: context, func: updater
         })
         var value = models[setup.ns].write[setup.field].value;
         updater.call(context, value);
@@ -506,24 +422,8 @@ var chainer = function (){
       commonBasicAPI(api);
     }
   }
-  //PART 3: Common Functions ===================================================
-  //Call function with a context that has a parent context
-  //TODO this function *should* be call everywhere but it isn't
-  function callFunction(context, subContext, func, args){
-    for(var d in context){
-      subContext[d] = context[d];
-    }
-    func.apply(subContext, args);
-    for(d in context){
-      if (subContext.hasOwnProperty(d)){
-        context[d] = subContext[d];
-      } else {
-        delete context[d];
-      }
-    }
-  }
   
-  //PART 4 Operation Functions==================================================
+  //PART 3 Operation Functions==================================================
   //Method called by model.write when it's reload is set
   function reload(){
     //Calls all init functions
@@ -579,12 +479,10 @@ var chainer = function (){
         if (rawViews[tag].type == 2){
           var raw = rawViews[tag];
           $("[data-" + tag + "]").each(function(){
-            var setup = buildData($(this).attr("data-" + tag));
+            var setup = buildData($(this).data(tag));
             if (setup.category == raw.category){
-              generators.push({gen:
-                buildGenerator(tag, raw.init, $(this), setup.data),
-                run: raw.run
-              });
+              generators.push({context: {}, run: rawViews[tag].run, $cur: 
+              $(this), tag: tag, data: setup.data});
             }
           });
         } else if (rawViews[tag].type == 3){
@@ -597,7 +495,7 @@ var chainer = function (){
 
       //Creates the html generators
       for(var g in generators){
-        runGenerator(generators[g].gen, generators[g].run);
+        runGenerator(generators[g]);
       }
       
       //TODO maybe work the virtual generators here?
@@ -651,12 +549,12 @@ var chainer = function (){
     throwError("Not an array: " + value);
   }
   
-  function checkNS(ns, checkUsed = false){
+  function checkNS(ns, list){
     if (! /^[0-9a-zA-Z]+(\.[0-9a-zA-Z]+)*$/.test(ns)){
       throwError("Namespace string pattern is wrong: " + ns);
     }
-    if (checkUsed){
-      if (rawModels.hasOwnProperty(ns)){
+    if (list){
+      if (list.hasOwnProperty(ns)){
         throwError("Model with this namespace is in use: " + ns);
       }
     }
@@ -731,7 +629,7 @@ var chainer = function (){
     //TODO is it better load as soon as the file is being load?
     'model': function(ns, init){
       //Creates a model to use in modifiers, models, and system 
-      rawModels[checkNS(ns, true)] = checkFunction(init);
+      rawModels[checkNS(ns, rawModels)] = checkFunction(init);
       return this;
     },
     //Creates a loader but store it for now
@@ -744,10 +642,9 @@ var chainer = function (){
       return this;
     },
     //Creates a generator but store it for now
-    'generator': function(tag, category, init, run){
+    'generator': function(tag, category, run){
       //Modifies an element from either base model or from generator
       rawViews[checkTag(tag, true)] = {
-        init: checkFunction(init),
         category: checkCategory(category),
         run: checkFunction(run),
         type: 2
@@ -806,45 +703,43 @@ chainer.loader("std-frame", function(init){
 });
 
 //makes the panel collapse by clicking
-chainer.generator("std-collapse", "heading", function(init){
-  init.find("panel", function(child){});
-  this.collapse = init.data(false);
-}, function(run){
-  if(this.collapse){
-    run.edit("panel", function(child){
+chainer.generator("std-collapse", "heading", function(run){
+  var collapse = null;
+  run.find("panel", function(child){
+    if (collapse == null){
+      collapse = run.data(false);
+    }
+    if (collapse){
       $(child.get()).hide();
-    });
-  }
-  this.run = run;
+    }
+  });
   $(run.get()).click(function(){
-    run.edit("panel", function(child){
+    run.find("panel", function(child){
       $(child.get()).toggle();
     });
   })
 });
 
 //creates a css grid with lots of options
-chainer.generator("std-grid", "row", function(init){
-  init.children("col", function(edit){
-    this.span = edit.data(1);
-    //TODO more data is needed here
-  });
-  this.cols = init.data(1);
-  this.mobile = init.data("") == "mobile";
-}, function(run){
-  run.edit("col", function(edit){
+chainer.generator("std-grid", "row", function(run){
+  var cols = run.data(1);
+  var mobile = run.data("") == "mobile";
+  run.children("col", function(edit){
+    var span = edit.data(1);
     var $edit = $(edit.get());
     edit.recieve("std.media", function(refer){
       var width = "96%";
-      if (refer() != 'sm' || this.mobile){
-        width = ((100 / this.cols) * this.span) - 2 + "%";
+      if (refer() != 'sm' || mobile){
+        width = ((100 / cols) * span) - 2 + "%";
       }
       $edit.css("width", width);
     })
     $edit.css("float", "left").css("min-heigth", "1px")
       .css("box-sizing", "border-box").css("margin", "0 1%");
   })
-  $(run.append("br").get()).css("clear", "both");
+  run.append("br", function(br){
+    $(br.get()).css("clear", "both");
+  })
 });
 
 //creates a mobile sensitive modifier
@@ -881,10 +776,10 @@ chainer.modifier("std-click", function(init){
   var $init = $(init.get());
   //set enabled
   if (typeof enable == "boolean"){
-    $init.prop("disabled", enable);
+    $init.prop("disabled", ! enable);
   } else {
     init.recieve(enable, function(refer){
-      $init.prop("disabled", refer);
+      $init.prop("disabled", ! refer);
     });
   }
   
