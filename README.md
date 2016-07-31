@@ -58,18 +58,16 @@ This is a presenter that should be use the least as it will force the most of th
 * `pathFromModel()`, `pathFromScript(value)`, `pathFromHTML()` shows where to look for a path
 * `update(id, value)` inform a model that one of its field has been updated.
 * It comes functions to edit the element where the attribute is found.
+
 ##Generator
-This is the most complex presenter due it requiring two functions. It has four parameters: a unique `data-*` attribute, generator category, a init function and a run function. The attribute have this pattern `/^[0-9a-z]+(\-[0-9a-z]+)*$/`. The category uses `/[0-9a-zA-Z_]+/` pattern. Each generator attribute value is an array starts with a category. The generators only picks the tag with the same category
-The init function has the following functions.
+This is the most complex presenter due its abilty to produce more presenters. It has three parameters: a unique `data-*` attribute, generator category, and a run function. The attribute have this pattern `/^[0-9a-z]+(\-[0-9a-z]+)*$/`. The category uses `/[0-9a-zA-Z_]+/` pattern. Each generator attribute value is an array starts with a category. The generators only picks the tag with the same category.
+
+The init function has the following function.
 * `children(category, init)` creates a new generator of the element's children with the same tag of a different category.
 * `find(category, init)` creates a new generator with the same tag and id but with a different category. Id comes from calling `data()`
 * `data(defaulted)` gets the next value in generator data list.
-
-The second function has the following functions.
-* `edit(category, run)` calls a group of children and update them 
-* `genData(tag, category, data)` adds a virtual generator to be use by own or different generator
-* `generator(tag, category, data)` call a generator virtually
-* `modifier(tag, data)` call a modifier virtually
+* `generator(tag, category, data)` add a generator attribute and call if possible
+* `modifier(tag, data)` add a modifier attriubte and call it.
 * `update(id, value)` inform a model that one of its field has been updated.
 * It comes functions to edit the element where the attribute is found.
 
