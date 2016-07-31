@@ -5,7 +5,7 @@ var chainer = function (){
   //PART 1: Models==============================================================
   var models = {};// A group main models 
   
-  //Builds and run the a rawModels of type = 0 (Model)
+  //Builds and run the a rawModels of model
   //ns is the namespace of the model, which acts like a class in java
   //init is from the programmer using this framework
   function buildRunModel(ns, init){
@@ -243,7 +243,7 @@ var chainer = function (){
   function buildData(data){
     //TODO check if the data dosen't needs "[]"
     if (! $.isArray(data)){
-      var raw = $.parseJSON("[" + data + "]");
+      var raw = JSON.parse("[" + data + "]");
     }
     if (raw.length < 1){
       throwError("Not enough data: " + data);
@@ -257,7 +257,7 @@ var chainer = function (){
   //Builds the generator Calls by child init generators, virtual create or by
   //the main functions
   function runGenerator(generator){
-    //context, run, $cur, tag, data 
+    //context, run, $cur, tag, data, model
     var api = {};
     api['children'] = function(category, run){
       $(">[data-" + generator.tag + "]", generator.$cur).each(function(){
@@ -300,7 +300,7 @@ var chainer = function (){
       var $child = $("<" + tag + ">");
       generator.$cur.append($child);
       var child = {context: generator.context, run: run, $cur: $child, 
-        tag: generator.tag,data: {data: []}};
+        tag: generator.tag,data: [], model: generator.model};
       runGenerator(child);
     }
     api['modifier'] = function(tag, attrVal){
@@ -309,7 +309,7 @@ var chainer = function (){
         var view = rawViews[tag];
         if (view.type == 3){
           var modifier = {context: generator.context, run: view.run, 
-            $cur: generator.$cur, data:attrVal};
+            $cur: generator.$cur, data:attrVal, model: generator.model};
           return runModifier(modifier);
         }
       }
@@ -320,20 +320,48 @@ var chainer = function (){
       if (rawViews.hasOwnProperty(tag)){
         var view = rawViews[tag];
         if (view.type == 2 && view.category == category){
-          var gen = {context: generator.context, run: view.run, $cur: generator.$cur, 
-            tag: generator.tag, data: data}
+          var gen = {context: generator.context, run: view.run, 
+            $cur: generator.$cur, tag: generator.tag, data: data, 
+            model: generator.model}
           runGenerator(gen);
         }
       }
     }
-    viewBasicAPI(generator.$cur, generator.context, api);
+    api['model'] = function(tag, id, func){
+      var local = {};
+      id = parseID(id, 1);
+      function run(value){
+        for(var v in value){
+          if (! local.hasOwnProperty(v)){
+            var $child = $("<" + tag + ">");
+            local[v] = {$child: $child};
+            generator.$cur.append($child);
+          } else {
+            var $child = local[v].$child;
+          }
+          var gen = {context: generator.context, run: func, $cur: $child,
+            tag: generator.tag, data: [], model: value[v]};
+          runGenerator(gen);
+        }
+        for(var v in local){
+          if (! value.hasOwnProperty(v)){
+            local[v].$child.remove();
+            delete local[v];
+          }
+        }
+      }
+      models[id.ns].write[id.field].refers.push({
+        $cur: generator.$cur, context: generator.context, func: run
+      });
+    }
+    viewBasicAPI(generator.$cur, generator.context, api, generator.model);
     elementBasicAPI(generator.$cur, api);
     generator.run.call(generator.context, api);
   }
   
   var modifiers = [];
   function runModifier(modifier){
-    //context:{}, run: rawViews[tag].run, $cur: $(this), data: ??
+    //context:{}, run: rawViews[tag].run, $cur: $(this), data: ??, model: {}
     
     //Edits the element
     var api = {};
@@ -342,7 +370,7 @@ var chainer = function (){
       return modifier.data;
     };
     //other api
-    viewBasicAPI(modifier.$cur, modifier.context, api);
+    viewBasicAPI(modifier.$cur, modifier.context, api, modifier.model);
     elementBasicAPI(modifier.$cur, api)
     modifier.run.call(modifier.context, api);
     return this;
@@ -354,7 +382,6 @@ var chainer = function (){
     api['get'] = function(){
       return ($cur.get());
     }
-    //TODO a lot more element editing API
     return api;
   }
   
@@ -373,16 +400,13 @@ var chainer = function (){
     if (virtual){
       //the requesting view is base on virtual dom
       api['recieve'] = function(id, updater){
-        var setup = parseID(id, 1);
-        virtual[setup.ns].write[setup.field].refers.push({
-          $cur: $cur, context: context, func: updater, type: 3
-        })
-        var value = models[setup.ns].write[setup.field].value;
-        updater.call(context, value);
+        if (virtual.hasOwnProperty(id)){
+          updater.call(context, virtual[id]);
+        }
       }
       api['update'] = function(id, value){
         var setup = parseID(id, 2);
-        var target = virtual[setup.ns].read[setup.field].refer;
+        var target = models[setup.ns].read[setup.field].refer;
         target.func.call(target.context, value);
       };
     } else {
@@ -390,7 +414,7 @@ var chainer = function (){
       api['recieve'] = function(id, updater){
         var setup = parseID(id, 1);
         models[setup.ns].write[setup.field].refers.push({
-          $cur: $cur, context: context, func: updater, type: 3
+          $cur: $cur, context: context, func: updater
         })
         var value = models[setup.ns].write[setup.field].value;
         updater.call(context, value);
@@ -398,24 +422,8 @@ var chainer = function (){
       commonBasicAPI(api);
     }
   }
-  //PART 3: Common Functions ===================================================
-  //Call function with a context that has a parent context
-  //TODO this function *should* be call everywhere but it isn't
-  function callFunction(context, subContext, func, args){
-    for(var d in context){
-      subContext[d] = context[d];
-    }
-    func.apply(subContext, args);
-    for(d in context){
-      if (subContext.hasOwnProperty(d)){
-        context[d] = subContext[d];
-      } else {
-        delete context[d];
-      }
-    }
-  }
   
-  //PART 4 Operation Functions==================================================
+  //PART 3 Operation Functions==================================================
   //Method called by model.write when it's reload is set
   function reload(){
     //Calls all init functions
@@ -541,12 +549,12 @@ var chainer = function (){
     throwError("Not an array: " + value);
   }
   
-  function checkNS(ns, checkUsed = false){
+  function checkNS(ns, list){
     if (! /^[0-9a-zA-Z]+(\.[0-9a-zA-Z]+)*$/.test(ns)){
       throwError("Namespace string pattern is wrong: " + ns);
     }
-    if (checkUsed){
-      if (rawModels.hasOwnProperty(ns)){
+    if (list){
+      if (list.hasOwnProperty(ns)){
         throwError("Model with this namespace is in use: " + ns);
       }
     }
@@ -621,7 +629,7 @@ var chainer = function (){
     //TODO is it better load as soon as the file is being load?
     'model': function(ns, init){
       //Creates a model to use in modifiers, models, and system 
-      rawModels[checkNS(ns, true)] = checkFunction(init);
+      rawModels[checkNS(ns, rawModels)] = checkFunction(init);
       return this;
     },
     //Creates a loader but store it for now
