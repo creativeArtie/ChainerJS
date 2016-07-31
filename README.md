@@ -45,8 +45,8 @@ Model takes two paremeters: namespace and init function. The namespace uses this
 * `write(field, value)` is either: (a) create a field with a value or (b) set a field with a value and call its listeners.
 * `read(field, updater)` opens a way for a presentater to send updates. When there is an update the updater will be called.
 * `share(field, value)` is either: (a) send data to models listening to it or (b) opens a function that another model can call this model
-* `refer(field, updater)` listen to another model and allowed to call its function if the value store is one.
-* `get(field)` get the value from another model without listen to it. This is lighter function call then `refer`
+* `refer(id, updater)` listen to another model and allowed to call its function if the value store is one.
+* `use(id)` get the value from another model without listen to it. This is lighter function call then `refer`
 
 ##Server
 TODO not yet desgined
@@ -66,7 +66,7 @@ The init function has the following functions.
 * `data(defaulted)` gets the next value in generator data list.
 
 The second function has the following functions.
-* `children(category, run)` calls a group of children and update them 
+* `edit(category, run)` calls a group of children and update them 
 * `genData(tag, category, data)` adds a virtual generator to be use by own or different generator
 * `generator(tag, category, data)` call a generator virtually
 * `modifier(tag, data)` call a modifier virtually
