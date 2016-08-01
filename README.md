@@ -53,11 +53,10 @@ TODO not yet desgined
 
 ##Loader
 This is a presenter that should be use the least as it will force the most of the page to reload. It is the only presenter that load elements from a different file. It takes two parameters a unique `data-*` attribute name and an init function. The attribute name uses this pattern `/^[0-9a-z]+(\-[0-9a-z]+)*$/`. It's api has these functions:
-* `init(func)` calls func before loading but after the attribute is found
-* `ready(func)` calls func after loading is completed.
 * `pathFromModel()`, `pathFromScript(value)`, `pathFromHTML()` shows where to look for a path
-* `update(id, value)` inform a model that one of its field has been updated.
-* `get()` gets the underlining HTML tag. In the future, this HTML taga can be deleted.
+* `init(func)` and `ready(func)`  calls a func at a certain time, `init` for before loading and `ready` for after. Both of these has the following functions:
+  * `get()` get underlining HTML element. In the future, this HTML tag can be deleted.
+  * `update(id, value)` inform a model that one of its field has been updated.
 
 ##Generator
 This is the most complex presenter due its abilty to produce more presenters. It has three parameters: a unique `data-*` attribute, generator category, and a run function. The attribute have this pattern `/^[0-9a-z]+(\-[0-9a-z]+)*$/`. The category uses `/[0-9a-zA-Z_]+/` pattern. Each generator attribute value is an array starts with a category. The generators only picks the tag with the same category.
@@ -66,11 +65,11 @@ The init function has the following function.
 * `children(category, init)` creates a new generator of the element's children with the same tag of a different category.
 * `find(category, init)` creates a new generator with the same tag and id but with a different category. Id comes from calling `data()`
 * `data(defaulted)` gets the next value in generator data list.
-* `generator(tag, category, data)` add a generator attribute and call if possible
-* `modifier(tag, data)` add a modifier attriubte and call it.
-* `model(tag, id, func)` create a generator with a localized model based on an object from the main model data.
+* `generator(tag, category, data)` use a generator presenter and call if possible
+* `modifier(tag, data)` use a modifier presenter and call it.
+* `model(tag, id, func)` create a generator with a localized model based on an object from a main model data.
 * `update(id, value)` inform a model that one of its field has been updated.
-* `get()` gets the underlining HTML tag. In the future, this HTML taga can be deleted.
+* `get()` gets the underlining HTML element. In the future, this HTML tag can be deleted.
 
 Child init and run function calls recusively with the same functions.
 
@@ -78,7 +77,7 @@ Child init and run function calls recusively with the same functions.
 This is a simple presenter with two parameters: a unique tag name and run function. It comes with these functions
 * `attr` gets the data from either it's `data-*` attribute or from virtual attribute
 * `update(id, value)` inform a model that one of its field has been updated.
-* `get()` gets the underlining HTML tag. In the future, this HTML taga can be deleted.
+* `get()` gets the underlining HTML tag. In the future, this HTML tag can be deleted.
 
 ##System
 This tells the ChainerJS what to do when it is reloading or loading the html files. It comes with these functions
@@ -86,7 +85,7 @@ This tells the ChainerJS what to do when it is reloading or loading the html fil
 * `ready(priority, func)`, `ready(func)` tell the framework what to do after loading
 * All child functions comes with:
   * `update(id, value)` inform a model that one of its field has been updated.
-  * It comes functions to edit the element where the attribute is found.
+  * `get()` gets the `<body>` element.
 
 ##Project goals
 I have no idea when I will be around updating the script and unless I get pay to continue, I might not be able work on this project long-term.
