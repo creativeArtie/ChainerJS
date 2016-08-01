@@ -40,7 +40,8 @@ Where:
 * the function with the api as parameter is call the parent function to the nested function
 * the function with the api1 as a parameter is call the child function 
 
-##Model
+##ChainerJS Interface
+###Model
 Model takes two paremeters: namespace and init function. The namespace uses this pattern `/^[0-9a-zA-Z]+(\.[0-9a-zA-Z]+)*$/` and must be by other models. The init is a function that inits the function. It has these functions:
 * `write(field, value)` is either: (a) create a field with a value or (b) set a field with a value and call its listeners.
 * `read(field, updater)` opens a way for a presentater to send updates. When there is an update the updater will be called.
@@ -48,17 +49,17 @@ Model takes two paremeters: namespace and init function. The namespace uses this
 * `refer(id, updater)` listen to another model and allowed to call its function if the value store is one.
 * `use(id)` get the value from another model without listen to it. This is lighter function call then `refer`
 
-##Server
+###Server
 TODO not yet desgined
 
-##Loader
+###Loader
 This is a presenter that should be use the least as it will force the most of the page to reload. It is the only presenter that load elements from a different file. It takes two parameters a unique `data-*` attribute name and an init function. The attribute name uses this pattern `/^[0-9a-z]+(\-[0-9a-z]+)*$/`. It's api has these functions:
 * `pathFromModel()`, `pathFromScript(value)`, `pathFromHTML()` shows where to look for a path
 * `init(func)` and `ready(func)`  calls a func at a certain time, `init` for before loading and `ready` for after. Both of these has the following functions:
   * `get()` get underlining HTML element. In the future, this HTML tag can be deleted.
   * `update(id, value)` inform a model that one of its field has been updated.
 
-##Generator
+###Generator
 This is the most complex presenter due its abilty to produce more presenters. It has three parameters: a unique `data-*` attribute, generator category, and a run function. The attribute have this pattern `/^[0-9a-z]+(\-[0-9a-z]+)*$/`. The category uses `/[0-9a-zA-Z_]+/` pattern. Each generator attribute value is an array starts with a category. The generators only picks the tag with the same category.
 
 The init function has the following function.
@@ -73,13 +74,13 @@ The init function has the following function.
 
 Child init and run function calls recusively with the same functions.
 
-##Modifier
+###Modifier
 This is a simple presenter with two parameters: a unique tag name and run function. It comes with these functions
 * `attr` gets the data from either it's `data-*` attribute or from virtual attribute
 * `update(id, value)` inform a model that one of its field has been updated.
 * `get()` gets the underlining HTML tag. In the future, this HTML tag can be deleted.
 
-##System
+###System
 This tells the ChainerJS what to do when it is reloading or loading the html files. It comes with these functions
 * `init(priority, func)`, `init(func)` tell the framework what to do before loading
 * `ready(priority, func)`, `ready(func)` tell the framework what to do after loading
