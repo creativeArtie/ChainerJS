@@ -241,16 +241,15 @@ var chainer = function (){
   var generators = [];
   //Create a data array and return the category and data
   function buildData(data){
-    //TODO check if the data dosen't needs "[]"
     if (! $.isArray(data)){
-      var raw = JSON.parse("[" + data + "]");
+      data = JSON.parse("[" + data + "]");
     }
-    if (raw.length < 1){
+    if (data.length < 1){
       throwError("Not enough data: " + data);
     }
-    var category = raw.shift();
+    var category = data.shift();
     
-    return {category: category, data: raw};
+    return {category: category, data: data};
     
   }
   
@@ -315,13 +314,14 @@ var chainer = function (){
       }
     }
     api['generator'] = function(tag, category, data){
-      generator.$cur.attr("data-" + tag, JSON.stringify(
-        data.unshift(category)));
+      var use = data.slice();
+      data.unshift(category);
+      generator.$cur.attr("data-" + tag, JSON.stringify(data));
       if (rawViews.hasOwnProperty(tag)){
         var view = rawViews[tag];
         if (view.type == 2 && view.category == category){
           var gen = {context: generator.context, run: view.run, 
-            $cur: generator.$cur, tag: generator.tag, data: data, 
+            $cur: generator.$cur, tag: tag, data: use, 
             model: generator.model}
           runGenerator(gen);
         }
@@ -339,6 +339,7 @@ var chainer = function (){
           } else {
             var $child = local[v].$child;
           }
+          $child.empty();
           var gen = {context: generator.context, run: func, $cur: $child,
             tag: generator.tag, data: [], model: value[v]};
           runGenerator(gen);
@@ -402,6 +403,8 @@ var chainer = function (){
       api['recieve'] = function(id, updater){
         if (virtual.hasOwnProperty(id)){
           updater.call(context, virtual[id]);
+        } else {
+          update.call(context, undefined);
         }
       }
       api['update'] = function(id, value){
@@ -426,10 +429,6 @@ var chainer = function (){
   //PART 3 Operation Functions==================================================
   //Method called by model.write when it's reload is set
   function reload(){
-    //Calls all init functions
-    for(var f in inits){
-      inits[f](elementBasicAPI($("body"), commonBasicAPI({})));
-    }
     //Clear all views listeners
     for (ns in models){
       for(m in models[ns].read){
@@ -459,7 +458,12 @@ var chainer = function (){
       inits[f](elementBasicAPI($("body"), commonBasicAPI({})));
     }
     
-    load();
+    $.when(load()).then(function(){
+      //Updates the ready functions
+      for(var r in readys){
+        readys[r](elementBasicAPI($("body"), commonBasicAPI({})));
+      }
+    })
   });
   
   //Actions share by reload() and $(document).ready()
@@ -472,6 +476,7 @@ var chainer = function (){
       }
     }
     
+    var $deferred = $.Deferred();
     //Load leaders
     $.when.apply(null, buildRunLoaders($("html"))).then(function(){
       //Creates views
@@ -505,11 +510,9 @@ var chainer = function (){
         runModifier(modifiers[m]);
       }
       
-      //Updates the ready functions
-      for(var r in readys){
-        readys[r](elementBasicAPI($("body"), commonBasicAPI({})));
-      }
+      $deferred.resolve();
     });
+    return $deferred;
   }
 
   //PART 5: Checking Functions==================================================
