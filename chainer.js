@@ -5,7 +5,7 @@ var chainer = function (){
   //PART 1: Models==============================================================
   var models = {};// A group main models 
   
-  //Builds and run the a rawModels of model
+  //Builds and run the a model
   //ns is the namespace of the model, which acts like a class in java
   //init is from the programmer using this framework
   function buildRunModel(ns, init){
@@ -90,11 +90,14 @@ var chainer = function (){
       models[ns].read[field].refer = {context: context, func: updater};
     };
     //Gets the shared data without the needs to listen to it.
-    api['use'] = function(id, value){
-      var setup = parseID(id);
+    api['use'] = function(id){
+      var setup = parseID(id, "share");
       return models[setup.ns].share[setup.field].value;
     };
-    //TODO create delete function to free space?
+    api['destory'] = function(){
+      //TODO test for memory leaks
+      delete models[ns];
+    }
     init.call(context, api);
   }
   
@@ -115,16 +118,8 @@ var chainer = function (){
     var ns = raw.join(".");
     if (type){
       if (models.hasOwnProperty(ns)){
-        switch (type){
-          case 1:
-            if (!models[ns].write.hasOwnProperty(field)){
-              throwError("Field not found: " + id);
-            }
-            break;
-          case 2:
-            if (!models[ns].read.hasOwnProperty(field)){
-              throwError("Field not found: " + id);
-            }
+        if (!models[ns][type].hasOwnProperty(field)){
+          throwError("Field not found: " + id);
         }
       } else {
         throwError("Namespace not found: " + id);
@@ -180,7 +175,7 @@ var chainer = function (){
           };
           //Parse the attribute value as an id and listen to a model write field
           api['pathFromModel'] = function(){
-            var pair = parseID($cur.data(tag), 1);
+            var pair = parseID($cur.data(tag), "write");
             var ns = pair.ns;
             var field = pair.field;
             if(models.hasOwnProperty(ns) && 
@@ -329,7 +324,7 @@ var chainer = function (){
     }
     api['model'] = function(tag, id, func){
       var local = {};
-      id = parseID(id, 1);
+      id = parseID(id, "write");
       function run(value){
         for(var v in value){
           if (! local.hasOwnProperty(v)){
@@ -389,7 +384,7 @@ var chainer = function (){
   //have a view to update a model read field
   function commonBasicAPI(api){
     api['update'] = function(id, value){
-      var setup = parseID(id, 2);
+      var setup = parseID(id, "read");
       var target = models[setup.ns].read[setup.field].refer;
       target.func.call(target.context, value);
     };
@@ -404,23 +399,38 @@ var chainer = function (){
         if (virtual.hasOwnProperty(id)){
           updater.call(context, virtual[id]);
         } else {
-          update.call(context, undefined);
+          updater.call(context, undefined);
         }
       }
       api['update'] = function(id, value){
-        var setup = parseID(id, 2);
+        var setup = parseID(id, "read");
         var target = models[setup.ns].read[setup.field].refer;
         target.func.call(target.context, value);
       };
+      api['use'] = function(id){
+        return virtual[id];
+      }
+      api['hasID'] = function(id){
+        return virtual.hasOwnProperty(id);
+      }
     } else {
       //the requesting view is base on dom or serve
       api['recieve'] = function(id, updater){
-        var setup = parseID(id, 1);
+        var setup = parseID(id, "write");
         models[setup.ns].write[setup.field].refers.push({
           $cur: $cur, context: context, func: updater
         })
         var value = models[setup.ns].write[setup.field].value;
         updater.call(context, value);
+      }
+      api['use'] = function(id){
+        var setup = parseID(id, "write");
+        return models[setup.ns].write[id.field].value;
+      }
+      api['hasID'] = function(id){
+        var setup = parseID(id);
+        return models.hasOwnProperty(setup.ns) && 
+          models[setup.ns].write.hasOwnProperty(setup.field);
       }
       commonBasicAPI(api);
     }
@@ -448,10 +458,6 @@ var chainer = function (){
 
   //Method to call when all files are loaded
   $(document).ready(function(){
-    //builds the models
-    for(var r in rawModels){
-      buildRunModel(r, rawModels[r]);
-    }
     
     //Calls all init functions
     for(var f in inits){
@@ -509,7 +515,6 @@ var chainer = function (){
       for(var m in modifiers){
         runModifier(modifiers[m]);
       }
-      
       $deferred.resolve();
     });
     return $deferred;
@@ -553,7 +558,7 @@ var chainer = function (){
   }
   
   function checkNS(ns, list){
-    if (! /^[0-9a-zA-Z]+(\.[0-9a-zA-Z]+)*$/.test(ns)){
+    if (! /^[0-9a-zA-Z_]+(\.[0-9a-zA-Z_]+)*$/.test(ns)){
       throwError("Namespace string pattern is wrong: " + ns);
     }
     if (list){
@@ -596,7 +601,6 @@ var chainer = function (){
   //PART 6: Setup the api for ChainerJS=========================================
   var inits = [];
   var readys = [];
-  var rawModels = {};
   var rawViews = {};
   return {
     //Allows the setting of function what to do before and after loading
@@ -632,7 +636,7 @@ var chainer = function (){
     //TODO is it better load as soon as the file is being load?
     'model': function(ns, init){
       //Creates a model to use in modifiers, models, and system 
-      rawModels[checkNS(ns, rawModels)] = checkFunction(init);
+      buildRunModel(checkNS(ns, models), init)
       return this;
     },
     //Creates a loader but store it for now
@@ -667,32 +671,6 @@ var chainer = function (){
 }();
 //PART 6: std built in libary===================================================
 //PART 6.1 model================================================================
-chainer.model("std", function(init){
-  //Data for screen size
-  var options = {
-  'sm': [true, false, false],  'sm-md': [true, true, false],
-  'sm-lg': [true, false, true],'md': [false, true, false],
-  'md-sm': [true, true, false],'md-lg': [false, true, true],
-  'lg': [false, false, true],  'lg-sm': [true, false, true],
-  'lg-md': [false, true, true]
-  }
-  function media(value){
-    var type = $(window).width() < 768 
-      ? 0 : ($(window).width() < 992? 1: 2);
-    if(typeof value === 'undefined'){
-      return type == 0 ? "sm" : (type == 1? 'md' : 'lg');
-    }
-    if (options.hasOwnProperty(value)){
-      return options[value][type];
-    }
-    return value;
-  }
-  init.write("media", media);
-  $(window).resize(function(){
-    init.write("media", media);
-  })
-  //TODO more to come
-})
 
 //6.2 views=====================================================================
 //load file directly from the attribute
@@ -705,61 +683,6 @@ chainer.loader("std-frame", function(init){
   init.pathFromModel();
 });
 
-//makes the panel collapse by clicking
-chainer.generator("std-collapse", "heading", function(run){
-  var collapse = null;
-  run.find("panel", function(child){
-    if (collapse == null){
-      collapse = run.data(false);
-    }
-    if (collapse){
-      $(child.get()).hide();
-    }
-  });
-  $(run.get()).click(function(){
-    run.find("panel", function(child){
-      $(child.get()).toggle();
-    });
-  })
-});
-
-//creates a css grid with lots of options
-chainer.generator("std-grid", "row", function(run){
-  var cols = run.data(1);
-  var mobile = run.data("") == "mobile";
-  run.children("col", function(edit){
-    var span = edit.data(1);
-    var $edit = $(edit.get());
-    edit.recieve("std.media", function(refer){
-      var width = "96%";
-      if (refer() != 'sm' || mobile){
-        width = ((100 / cols) * span) - 2 + "%";
-      }
-      $edit.css("width", width);
-    })
-    $edit.css("float", "left").css("min-heigth", "1px")
-      .css("box-sizing", "border-box").css("margin", "0 1%");
-  })
-  run.append("br", function(br){
-    $(br.get()).css("clear", "both");
-  })
-});
-
-//creates a mobile sensitive modifier
-chainer.modifier("std-class", function(run){
-  var $run = $(run.get());
-  run.recieve("std.media", function(refer){
-    var object = run.attr();
-    for(var c in object){
-      if (refer(object[c])){
-        $run.addClass(c);
-      }else {
-        $run.removeClass(c);
-      }
-    }
-  })
-});
-
 //creates a modifier that read from the model
 chainer.modifier("std-write", function(init){
   init.recieve(init.attr(), function(refer){
@@ -769,7 +692,7 @@ chainer.modifier("std-write", function(init){
 
 //adds a click function to a element
 chainer.modifier("std-click", function(init){
-  //TODO checking of data is needed
+  //TODO checking data type
   var data = init.attr();
   //Things needed for click 
   var calls = data.shift(); //which model read field to call
