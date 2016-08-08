@@ -53,7 +53,7 @@ Model takes two paremeters: namespace and init function. The namespace uses this
 TODO not yet desgined
 
 ###Loader
-This is a presenter that should be use the least as it will force the most of the page to reload. It is the only presenter that load elements from a different file. It takes two parameters a unique `data-*` attribute name and an init function. The attribute name uses this pattern `/^[0-9a-z]+(\-[0-9a-z]+)*$/`. It's api has these functions:
+This is a presenter that loads a file to an element and can do things before and after the loading the file. It is the only presenter that load elements from a different file. It takes two parameters a unique `data-*` attribute name and an init function. The attribute name uses this pattern `/^[0-9a-z]+(\-[0-9a-z]+)*$/`. It's api has these functions:
 * `pathFromModel()`, `pathFromScript(value)`, `pathFromHTML()` shows where to look for a path
 * `init(func)` and `ready(func)`  calls a func at a certain time, `init` for before loading and `ready` for after. Both of these has the following functions:
   * `get()` get underlining HTML element. In the future, this HTML tag can be deleted.
