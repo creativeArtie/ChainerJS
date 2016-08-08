@@ -25,9 +25,11 @@ var chainer = function (){
         //This is an field that has been set
         models[ns].write[field].value = value;
         
-        //Rebuild the entire page
-        if (models[ns].write[field].reload){
-          reload();
+        //Rebuild the part of the page
+        for (var v in models[ns].write[field].loaders){
+          var loader = models[ns].write[field].loaders[v];
+          loader.$cur.empty();
+          buildRunLoader(loader, []);
           return;
         }
         
@@ -40,8 +42,8 @@ var chainer = function (){
         //Creates a new field
         //Value = value assoicated with the field
         //Refers = the list of views (excludes loader) that listen to it
-        //Reload = reload the page if it set and field value is changed.
-        models[ns].write[field] = {value: value, refers: [], reload: false};
+        //Loader = list of loaders the page if it set and field value is changed.
+        models[ns].write[field] = {value: value, refers: [], loaders: []};
       }
     }
     // Share data amoung the models
@@ -94,10 +96,6 @@ var chainer = function (){
       var setup = parseID(id, "share");
       return models[setup.ns].share[setup.field].value;
     };
-    api['destory'] = function(){
-      //TODO test for memory leaks
-      delete models[ns];
-    }
     init.call(context, api);
   }
   
@@ -135,101 +133,102 @@ var chainer = function (){
   
   //PART 2.2: Loaders===========================================================
   //These are views that do distructive html editing by loading files into it.
-  
-  //Build and run all loaders and make all view asoicate tag 
-  function buildRunLoaders($cur){
+  function initLoaders($cur){
     //Step 1: setup
     var deferreds = []; //for loading files
     for (var tag in rawViews){
       tagSetup(tag); //Add data- to all view if missing
       if(rawViews[tag].type == 1){
         $("[data-" + tag + "]", $cur).each(function(){
-        
-          //Step 2: set up and runs system.init
-          var $cur = $(this);
-          var prep = null;
-          var path = null;
-          var post = null;
-          
-          //Set 3: setup the api 
-          var api = {};
-          //What to do before loading
-          api['init'] = function(func){
-            checkFunction(func)
-            if (prep == null){
-              prep = func;
-            } else {
-              throwError("Prep function is already set.");
-            }
-            return this;
-          };
-          //What to do after loading 
-          api['ready'] = function(func){
-            checkFunction(func)
-            if (post == null){
-              post = func;
-            } else {
-              throwError("Ready function is already set.");
-            }
-              return this;
-          };
-          //Parse the attribute value as an id and listen to a model write field
-          api['pathFromModel'] = function(){
-            var pair = parseID($cur.data(tag), "write");
-            var ns = pair.ns;
-            var field = pair.field;
-            if(models.hasOwnProperty(ns) && 
-              models[ns].write.hasOwnProperty(field)
-            ){
-              var model = models[ns].write[field];
-              model.reload = true;
-              path = checkPath(model.value);
-              return this;
-            }
-            throwError("Field not found: " + ns + "." + field);
-          };
-          //Parse the attribute value as a URL path
-          api['pathFromHTML'] = function(){
-            path = checkPath($cur.data(tag));
-          };
-          //The path is set up the view itself
-          api['pathFromScript'] = function(value){
-            path = checkPath(value);
-          };
-          var context = new rawViews[tag].init(api);
-          
-          //Step 3: setup and runs system.init.prep
-          var api = elementBasicAPI($cur, commonBasicAPI({}));
-          if (prep != null){
-            //TODO use a child context for prep
-            prep.call(context, api);
-          }
-          
-          //Step 4: call $(this).load() if not null.
-          if (path != null){
-            //Step 4.1: setup the loading
-            if (path == ""){
-              throwError("Path is empty.");
-            }
-            var deferred = $.Deferred();
-            $(this).load(path, function(){
-              //Step 4.2: recusive call when page is load
-              $.when.apply(null, buildRunLoaders($cur)).then(function (){
-                if (post != null){
-                  //TODO use a child context for post
-                  post.call(context, api);
-                }
-                deferred.resolve();
-              });
-            });
-            
-            deferreds.push(deferred);
-          }
-
+          buildRunLoader({$cur: $(this), init: rawViews[tag].init, tag: tag},
+          deferreds);
         });
       }
     }
     return deferreds;
+  }
+  
+  function buildRunLoader(loader, deferreds){
+    //$cur, init, tag
+    //Step 2: set up and runs system.init
+    
+    var prep = null;
+    var path = null;
+    var post = null;
+    
+    //Set 3: setup the api 
+    var api = {};
+    //What to do before loading
+    api['init'] = function(func){
+      checkFunction(func)
+      if (prep == null){
+        prep = func;
+      } else {
+        throwError("Prep function is already set.");
+      }
+      return this;
+    };
+    //What to do after loading 
+    api['ready'] = function(func){
+      checkFunction(func)
+      if (post == null){
+        post = func;
+      } else {
+        throwError("Ready function is already set.");
+      }
+        return this;
+    };
+    //Parse the attribute value as an id and listen to a model write field
+    api['pathFromModel'] = function(){
+      var pair = parseID(loader.$cur.data(loader.tag), "write");
+      var ns = pair.ns;
+      var field = pair.field;
+      if(models.hasOwnProperty(ns) && 
+        models[ns].write.hasOwnProperty(field)
+      ){
+        var model = models[ns].write[field];
+        model.loaders.push(loader);
+        path = checkPath(model.value);
+        return this;
+      }
+      throwError("Field not found: " + ns + "." + field);
+    };
+    //Parse the attribute value as a URL path
+    api['pathFromHTML'] = function(){
+      path = checkPath(loader.$cur.data(loader.tag));
+    };
+    //The path is set up the view itself
+    api['pathFromScript'] = function(value){
+      path = checkPath(value);
+    };
+    var context = new loader.init(api);
+    
+    //Step 3: setup and runs system.init.prep
+    var api = elementBasicAPI(loader.$cur, commonBasicAPI({}));
+    if (prep != null){
+      prep.call(context, api);
+    }
+    
+    //Step 4: call $(this).load() if not null.
+    if (path != null){
+      //Step 4.1: setup the loading
+      if (path == ""){
+        throwError("Path is empty.");
+      }
+      var deferred = $.Deferred();
+      loader.$cur.load(path, function(){
+        //Step 4.2: recusive call when page is load
+        $.when.apply(null, initLoaders(loader.$cur)).then(function (){
+          if (post != null){
+            //TODO use a child context for post
+            post.call(context, api);
+          }
+          deferred.resolve();
+        });
+      });
+      
+      deferreds.push(deferred);
+    }
   }
   
   //PART 2.3 Generator related functions =======================================
@@ -437,25 +436,7 @@ var chainer = function (){
   }
   
   //PART 3 Operation Functions==================================================
-  //Method called by model.write when it's reload is set
-  function reload(){
-    //Clear all views listeners
-    for (ns in models){
-      for(m in models[ns].read){
-        models[ns].read[m].refers = [];
-      }
-      for(m in models[ns].write){
-        models[ns].write[m].refers = [];
-      }
-    }
-    //clear all views
-    loaders = [];
-    generators = [];
-    modifiers = [];
-    
-    load();
-  }
-
+  
   //Method to call when all files are loaded
   $(document).ready(function(){
     
@@ -464,7 +445,15 @@ var chainer = function (){
       inits[f](elementBasicAPI($("body"), commonBasicAPI({})));
     }
     
-    $.when(load()).then(function(){
+    for(var tag in rawViews){
+      if (rawViews[tag].type == 1){
+        tagSetup(tag);
+        $("[data-" + tag + "]").empty();
+        $("[" + tag + "]").empty();
+      }
+    }
+    
+    $.when(load($("html"))).then(function(){
       //Updates the ready functions
       for(var r in readys){
         readys[r](elementBasicAPI($("body"), commonBasicAPI({})));
@@ -472,24 +461,18 @@ var chainer = function (){
     })
   });
   
-  //Actions share by reload() and $(document).ready()
-  function load(){
-    //Clear all loaders' children
-    for(var tag in rawViews){
-      if (rawViews[tag].type == 1){
-        tagSetup(tag);
-        $("[data-" + tag + "]").empty();
-      }
-    }
-    
+  //Actions share by model and $(document).ready()
+  function load($from){
     var $deferred = $.Deferred();
+    var generators = [];
+    var modifiers = [];
     //Load leaders
-    $.when.apply(null, buildRunLoaders($("html"))).then(function(){
+    $.when.apply(null, initLoaders($from)).then(function(){
       //Creates views
-      for(tag in rawViews){
+      for(var tag in rawViews){
         if (rawViews[tag].type == 2){
           var raw = rawViews[tag];
-          $("[data-" + tag + "]").each(function(){
+          $("[data-" + tag + "]", $from).each(function(){
             var setup = buildData($(this).data(tag));
             if (setup.category == raw.category){
               generators.push({context: {}, run: rawViews[tag].run, $cur: 
@@ -497,7 +480,7 @@ var chainer = function (){
             }
           });
         } else if (rawViews[tag].type == 3){
-          $("[data-" + tag + "]").each(function(){
+          $("[data-" + tag + "]", $from).each(function(){
             modifiers.push({context:{}, run: rawViews[tag].run, $cur: $(this),
               data: $(this).data(tag)});
           });
@@ -509,8 +492,6 @@ var chainer = function (){
         runGenerator(generators[g]);
       }
       
-      //TODO maybe work the virtual generators here?
-      
       //creates the html modifiers
       for(var m in modifiers){
         runModifier(modifiers[m]);
@@ -519,7 +500,6 @@ var chainer = function (){
     });
     return $deferred;
   }
-
   //PART 5: Checking Functions==================================================
   function checkNumeric(value){
     if ($.isNumeric(value)){ 
@@ -671,6 +651,32 @@ var chainer = function (){
 }();
 //PART 6: std built in libary===================================================
 //PART 6.1 model================================================================
+chainer.model("std", function(init){
+  //Data for screen size
+  var options = {
+  'sm': [true, false, false],  'sm-md': [true, true, false],
+  'sm-lg': [true, false, true],'md': [false, true, false],
+  'md-sm': [true, true, false],'md-lg': [false, true, true],
+  'lg': [false, false, true],  'lg-sm': [true, false, true],
+  'lg-md': [false, true, true]
+  }
+  function media(value){
+    var type = $(window).width() < 768 
+      ? 0 : ($(window).width() < 992? 1: 2);
+    if(typeof value === 'undefined'){
+      return type == 0 ? "sm" : (type == 1? 'md' : 'lg');
+    }
+    if (options.hasOwnProperty(value)){
+      return options[value][type];
+    }
+    return value;
+  }
+  init.write("media", media);
+  $(window).resize(function(){
+    init.write("media", media);
+  })
+  //TODO more to come
+})
 
 //6.2 views=====================================================================
 //load file directly from the attribute
@@ -683,6 +689,78 @@ chainer.loader("std-frame", function(init){
   init.pathFromModel();
 });
 
+//makes the panel collapse by clicking
+chainer.generator("std-collapse", "heading", function(run){
+  var collapse = null;
+  run.find("panel", function(child){
+    if (collapse == null){
+      collapse = run.data(false);
+    }
+    if (collapse){
+      $(child.get()).hide();
+    }
+  });
+  $(run.get()).click(function(){
+    run.find("panel", function(child){
+      $(child.get()).toggle();
+    });
+  })
+});
+
+//creates a css grid with lots of options
+chainer.generator("std-grid", "row", function(run){
+  var cols = run.data(1);
+  var mobile = run.data("") == "mobile";
+  var size = 0;
+  var $rest = null;
+  run.children("col", function(edit){
+    var span = edit.data(1);
+    var $edit = $(edit.get());
+    edit.recieve("std.media", function(refer){
+      var cal = span;
+      var refer = refer();
+      if (typeof span === "object"){
+        cal = span.hasOwnProperty(refer)? span[refer]:1;
+      }
+      var width = "96%";
+      if (refer != 'sm' || mobile){
+        width = ((100 / cols) * cal) - 2 + "%";
+    }
+    $edit.css("width", width);
+    });
+    $edit.css("float", "left").css("min-heigth", "1px")
+      .css("box-sizing", "border-box").css("margin", "0 1%");
+  })
+  run.append("br", function(br){
+    $(br.get()).css("clear", "both");
+  })
+});
+
+//creates a mobile sensitive modifier
+chainer.modifier("std-class", function(run){
+  var $run = $(run.get());
+  var object = run.attr();
+  for(var c in object){
+    if (run.hasID(object[c])){
+      run.recieve(object[c], function(value){
+        if (value){
+          $run.addClass(c);
+        } else {
+          $run.removeClass(c);
+        }
+      });
+    } else {
+    run.recieve("std.media", function(refer){
+        if (refer(object[c])){
+          $run.addClass(c);
+        }else {
+          $run.removeClass(c);
+        }
+      })
+    }
+  }
+});
+
 //creates a modifier that read from the model
 chainer.modifier("std-write", function(init){
   init.recieve(init.attr(), function(refer){
@@ -692,7 +770,7 @@ chainer.modifier("std-write", function(init){
 
 //adds a click function to a element
 chainer.modifier("std-click", function(init){
-  //TODO checking data type
+  //TODO checking of data is needed
   var data = init.attr();
   //Things needed for click 
   var calls = data.shift(); //which model read field to call
