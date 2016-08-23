@@ -1,3 +1,4 @@
+
 chainer.model("gui", function(init){
   //Data for screen size
   var options = {
@@ -39,7 +40,7 @@ chainer.generator("gui-collapse", "heading", function(run){
   });
   $(run.get()).click(function(){
     run.find("panel", function(child){
-      $(child.get()).toggle();
+      $(child.get()).slideToggle();
     });
   })
 });
@@ -97,3 +98,27 @@ chainer.modifier("gui-class", function(run){
     }
   }
 });
+
+//adds a click function to a element
+chainer.modifier("gui-click", function(init){
+  //TODO checking of data is needed
+  var data = init.attr();
+  //Things needed for click 
+  var calls = data.shift(); //which model read field to call
+  var enable = data.shift(); //check if the button is enable or not
+  var arg = data.length > 0? data.shift() : null; //arguments for the call
+  
+  var $init = $(init.get());
+  //set enabled
+  if (typeof enable == "boolean"){
+    $init.prop("disabled", ! enable);
+  } else {
+    init.recieve(enable, function(refer){
+      $init.prop("disabled", ! refer);
+    });
+  }
+  //set click function
+  $init.click(function(){
+    init.update(calls, arg);
+  })
+})
