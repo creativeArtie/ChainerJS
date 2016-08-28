@@ -88,5 +88,16 @@ This tells the ChainerJS what to do when it is reloading or loading the html fil
   * `update(id, value)` inform a model that one of its field has been updated.
   * `get()` gets the `<body>` element.
 
+##Libraries
+There are pre-built presenters and models grouped into different javascript files.
+
+###Core Library
+These presenters are in the [main file](chainer.js).
+
+* `std-load`: a loader that uses the attribute value as a path to find the file to load.
+* `std-frame`: a loader that uses the attribute value as an model id to find the file path.
+* `std-write`: a modifier that uses the attribute value as model id to update the text.
+* `std-read` : a modifier that uses the attribute value as model id to update the model. 
+
 ##Project goals
 I have no idea when I will be around updating the script and unless I get pay to continue, I might not be able work on this project long-term.
