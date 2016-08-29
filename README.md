@@ -4,25 +4,15 @@ ChainerJS is a Javascript MVP framework. The framework is currently is in workin
 
 ChainerJS requires [JQuery](https://jquery.com/), but there will be a milestone to stop depending on it.
 ###Why Use ChainerJS?
-* *ChainerJS probably has fast preformance*  
-  The changes to the model this framework are very explicit, therefore it know when the models are being updated and never need to use do any dirty checking like AngularJS.
-* *ChainerJS is more flexiable*  
-  You can use setInterval directly. You can also add `data-*` attributes that have nothing to do ChainerJS as long as there are no naming conflicts. ChainerJS don't even care about elements name. You can use different javascript libraries along with ChainerJS.  
-  In fact, you can put the html together using ChainerJS's `data-std-load` and then load the 3rd party library in the ChainerJS's ready function and your 3rd party JS library will act as if the whole html comes in one piece.
-* *ChainerJS has a low learning curve*  
-  To share data amoung the models, you just call the function `share` in sharing model and call the function `refer` or `get` in the recieving models. Compare this AngularJS, which require you to learn [services](https://docs.angularjs.org/guide/services) which have several way of [creating them](http://stackoverflow.com/questions/15666048/angularjs-service-vs-provider-vs-factory#15666049). You also worked with native function like setTimeout unlike in AngularJS where you have to learn to use [$timeout](https://docs.angularjs.org/api/ng/service/$timeout)
-* *ChainerJS model data are organized*  
-  The only way to change data in ChainerJS is through the one object api which declares it. Every data being shared outside of a model has a unique id and the id itself begins with a namespace to clearly indicate which model it come from. Compare this to AngularJS [inheritance scope](https://medium.com/@mnemon1ck/why-you-should-not-use-angularjs-1df5ddf6fc99#c14d)
-* *ChainerJS has a foucs on separation of concern*  
-  HTML file and its elements are representated is the view of the ChainerJS's MVP architecture and will only stores the static data. All the actual coding are in the javascript. Presenters uses `data-*` attributes but they no way knowing that attribute are made by other presenters. 
-* *ChainerJS's presenters are easy to reuse*  
-  When you want to use another presenter in a custom presenter you would just call `api.modifier` `api.genData` or `api.generator`. You can call presenters recusively just as easily. You don't need an [entire page](http://sporto.github.io/blog/2013/06/24/nested-recursive-directives-in-angular/) to teach you to how to build recusive presenters.
-(Note: Nothing against AngularJS, it was the framework that I kind of know.)
+* *ChainerJS is easy to learn*: There are very few methods in the core framework and they are uses the same syntax. You can and will directly manipiate the DOM inside the presenters. The presenters have clear define purpose: loaders loads HTML files, generators generates more presenters, and modifiers do simple DOM manipulation. In the future, there is also a way to quickly and easily communicate to the server.
+* *ChainerJS is reflexiable.*: ChainerJS works only with the elements that have customized attributes and `data-` attributes that matches it's presenters' name. You can modify, move or even delete an element without do anything special with ChainerJS. This allows things like using [AngularJS with ChainerJS](angular). 
+* *ChainerJS has clear separation of concern.*: ChainerJS doesn't resolve expressions in the HTML. Model data scope are restricted to the method that creates is namespace and will only updatable when the model is explicitly being told to share it.
+* *ChainerJS has a low resource demand.*: A model's data listener can be counted by the number of time when `receive` or `refer` is being called and the listeners only run when `write` or `share` is being called. Loading data from presenters are even easier to count the number of listeners and callers: there is only one listener for each data and called by the number of time when `update` is being called. ChainerJS does nothing fancy with the DOM. 
 
 ###Syntax
 Everything in ChainerJS uses this syntax:
 ~~~
-chainer.type(function(arg0, arg1, api){
+chainer.type(arg0, arg1, function(api){
   api.doSomething(argument1, argument2, function(api1){
   });
 });
@@ -42,9 +32,9 @@ Where:
 
 ##ChainerJS Interface
 ###Model
-Model takes two paremeters: namespace and init function. The namespace uses this pattern `/^[0-9a-zA-Z]+(\.[0-9a-zA-Z]+)*$/` and must be by other models. The init is a function that inits the function. It has these functions:
+Model takes two paremeters: namespace and init function. The namespace uses this pattern `/^[0-9a-zA-Z]+(\.[0-9a-zA-Z]+)*$/` and unique for each model. The init is a function that inits the function. It has these functions:
 * `write(field, value)` is either: (a) create a field with a value or (b) set a field with a value and call its listeners.
-* `read(field, updater)` opens a way for a presentater to send updates. When there is an update the updater will be called.
+* `read(field, updater)` opens a way for a presentater to send updates. When there is an update the `updater` will be called.
 * `share(field, value)` is either: (a) send data to models listening to it or (b) opens a function that another model can call this model
 * `refer(id, updater)` listen to another model and allowed to call its function if the value store is one.
 * `use(id)` get the value from another model without listen to it. This is lighter function call then `refer`
@@ -56,18 +46,18 @@ TODO not yet desgined
 This is a presenter that loads a file to an element and can do things before and after the loading the file. It is the only presenter that load elements from a different file. It takes two parameters a unique `data-*` attribute name and an init function. The attribute name uses this pattern `/^[0-9a-z]+(\-[0-9a-z]+)*$/`. It's api has these functions:
 * `pathFromModel()`, `pathFromScript(value)`, `pathFromHTML()` shows where to look for a path
 * `init(func)` and `ready(func)`  calls a func at a certain time, `init` for before loading and `ready` for after. Both of these has the following functions:
-  * `get()` get underlining HTML element. In the future, this HTML tag can be deleted.
+  * `get()` get underlining HTML element.
   * `update(id, value)` inform a model that one of its field has been updated.
 
 ###Generator
-This is the most complex presenter due its abilty to produce more presenters. It has three parameters: a unique `data-*` attribute, generator category, and a run function. The attribute have this pattern `/^[0-9a-z]+(\-[0-9a-z]+)*$/`. The category uses `/[0-9a-zA-Z_]+/` pattern. Each generator attribute value is an array starts with a category. The generators only picks the tag with the same category.
+This is the most complex presenter due its abilty to produce more presenters. It has three parameters: a unique `data-*` attribute, generator category, and a run function. The attribute have this pattern `/^[0-9a-z]+(\-[0-9a-z]+)*$/`. The category uses `/[0-9a-zA-Z_]+/` pattern and is optional. Each generator attribute value is an array might be starts with a category. The generators only picks the tag with the same category if the category is specified. 
 
 The init function has the following function.
 * `children(category, init)` creates a new generator of the element's children with the same tag of a different category.
 * `find(category, init)` creates a new generator with the same tag and id but with a different category. Id comes from calling `data()`
 * `data(defaulted)` gets the next value in generator data list.
-* `generator(tag, category, data)` use a generator presenter and call if possible
-* `modifier(tag, data)` use a modifier presenter and call it.
+* `generator(tag, category, data)` use a generator presenter and use it.
+* `modifier(tag, data)` use a modifier presenter and use it.
 * `model(tag, id, func)` create a generator with a localized model based on an object from a main model data.
 * `update(id, value)` inform a model that one of its field has been updated.
 * `get()` gets the underlining HTML element. In the future, this HTML tag can be deleted.
@@ -81,9 +71,9 @@ This is a simple presenter with two parameters: a unique tag name and run functi
 * `get()` gets the underlining HTML tag. In the future, this HTML tag can be deleted.
 
 ###System
-This tells the ChainerJS what to do when it is reloading or loading the html files. It comes with these functions
-* `init(priority, func)`, `init(func)` tell the framework what to do before loading
-* `ready(priority, func)`, `ready(func)` tell the framework what to do after loading
+This tells the ChainerJS what to do when ChainerJS is first start and when it is finish the inital presenters creation. It comes with these functions
+* `init(priority, func)`, `init(func)` tell the framework what to do before initialization. 
+* `ready(priority, func)`, `ready(func)` tell the framework what to do afte initialization.
 * All child functions comes with:
   * `update(id, value)` inform a model that one of its field has been updated.
   * `get()` gets the `<body>` element.
