@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+  <meta charset="utf-8">
+  <script src="../chainer.js"></script>
+  <style>div{border:1px solid;}div + div{margin-top: 1em;}</style>
+  <script>
+    chainer.model("test", function(model){
+      model.write("text1", "Hello");
+      model.write("text2", "World");
+      model.write("page", "page1.html");
+      model.read("edit", function(value){
+        model.write("page", value);
+      })
+    })
+    chainer.modifier("click", function(modifier){
+      $(modifier.get()).click(function(){
+        modifier.update("test.edit", "page2.html");
+      })
+    })
+  </script>
+  <body>
+    <button data-click="">Update</button>
+    <span std-write="test.text1"></span>
+    <span data-std-write="test.text2"></span>
+    <div data-std-load="page1.html"></div>
+    <div std-frame="test.page"></div>
+  </body>
+</html>

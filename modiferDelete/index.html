@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Model Write Remove</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+    <script src="../chainer.js"></script>
+  </head>
+  <body>
+    <p class="setRemove" std-write="test.show"></p>
+    <p std-write="test.show"></p>
+    <p class="setRemove" std-write="test.show"></p>
+    <p std-write="test.show"></p>
+    <p class="setRemove" std-write="test.show"></p>
+  </body>
+  <script>
+    chainer.model("test", function(model){
+      model.write("show","Hello World");
+      model.read("update", function(value){
+        model.write("show", value);
+      })
+    });
+    chainer.system(function(system){
+      system.ready(function(ready){
+        $(".setRemove").remove();
+        //Check add a line in chainer.js' write method
+        ready.update("test.update", "HelloWorld");
+        ready.update("test.update", "Hello Worlds!!!!!!!!");
+        
+      });
+    })
+  </script>
+</html>

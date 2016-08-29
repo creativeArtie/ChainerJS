@@ -26,17 +26,38 @@ var chainer = function (){
         models[ns].write[field].value = value;
         
         //Rebuild the part of the page
+        var remove = [];
         for (var v in models[ns].write[field].loaders){
           var loader = models[ns].write[field].loaders[v];
-          loader.$cur.empty();
-          buildRunLoader(loader, []);
-          return;
+          if(loader.$cur.parents("html").length){
+            loader.$cur.empty();
+            $.when.apply(null, buildRunLoader(loader, [])).then(function(){
+              load(loader.$cur);
+            })
+          } else {
+            remove.unshift(v);
+          }
+        }
+        
+        for (var r in remove){
+          models[ns].write[field].loaders[remove[r]].$cur.remove();
+          delete models[ns].write[field].loaders[remove[r]];
         }
         
         //Update the listeners
         for(var r in models[ns].write[field].refers){
           var refer = models[ns].write[field].refers[r];
-          refer.func.call(refer.context, value);
+          if(refer.$cur.parents("html").length){
+            refer.func.call(refer.context, value);
+          } else {
+            remove.unshift(r);
+          }
+        }
+        for (var r in remove){
+          if (models[ns].write[field].refers[remove[r]]){
+            models[ns].write[field].refers[remove[r]].$cur.remove();
+            delete models[ns].write[field].refers[remove[r]];
+          }
         }
       } else {
         //Creates a new field
@@ -229,21 +250,19 @@ var chainer = function (){
       
       deferreds.push(deferred);
     }
+    return deferreds;
   }
   
   //PART 2.3 Generator related functions =======================================
   var generators = [];
   //Create a data array and return the category and data
-  function buildData(data){
-    if (! $.isArray(data)){
-      data = JSON.parse("[" + data + "]");
-    }
+  function buildData($cur, tag){
+    var data = JSON.parse($cur.attr("data-" + tag));
     if (data.length < 1){
       throwError("Not enough data: " + data);
     }
-    var category = data.shift();
     
-    return {category: category, data: data};
+    return data;
     
   }
   
@@ -254,11 +273,14 @@ var chainer = function (){
     var api = {};
     api['children'] = function(category, run){
       $(">[data-" + generator.tag + "]", generator.$cur).each(function(){
-        var data = buildData($(this).data(generator.tag));
-        if (data.category == category){
-          var child = {context: generator.context, run, $cur: $(this), 
-            tag: generator.tag, data: data.data};
-          runGenerator(child);
+        var data = buildData($(this), generator.tag);
+        if (generator.category){
+          var cat = data.shift();
+          if (cat == category){
+            var child = {context: generator.context, run, $cur: $(this), 
+              tag: generator.tag, data: data, category: true};
+            runGenerator(child);
+          }
         }
       });
     }
@@ -272,13 +294,16 @@ var chainer = function (){
         }
       }
       $("[data-" + generator.tag + "]").each(function(){
-        var data = buildData($(this).data(generator.tag));
-        if (data.category == category){
-          data.target = data.data.length > 0? data.data.shift(): null;
-          if (data.target && data.target == target){
-            var child = {context: generator.context, run, $cur: $(this), 
-              tag: generator.tag, data: data.data, target: data.target};
-            runGenerator(child);
+        var data = buildData($(this), generator.tag);
+        if (generator.category){
+          var cat = data.shift();
+          if (cat == category){
+            var tar = data.length > 0? data.shift(): null;
+            if (tar && tar == target){
+              var child = {context: generator.context, run, $cur: $(this), 
+                tag: generator.tag, data: data, target: tar, category: true};
+              runGenerator(child);
+            }
           }
         }
       })
@@ -293,7 +318,8 @@ var chainer = function (){
       var $child = $("<" + tag + ">");
       generator.$cur.append($child);
       var child = {context: generator.context, run: run, $cur: $child, 
-        tag: generator.tag,data: [], model: generator.model};
+        tag: generator.tag,data: [], model: generator.model, 
+        category: generator.category};
       runGenerator(child);
     }
     api['modifier'] = function(tag, attrVal){
@@ -307,24 +333,30 @@ var chainer = function (){
         }
       }
     }
-    api['generator'] = function(tag, category, data){
-      var use = data.slice();
-      data.unshift(category);
-      generator.$cur.attr("data-" + tag, JSON.stringify(data));
-      if (rawViews.hasOwnProperty(tag)){
-        var view = rawViews[tag];
-        if (view.type == 2 && view.category == category){
-          var gen = {context: generator.context, run: view.run, 
-            $cur: generator.$cur, tag: tag, data: use, 
-            model: generator.model}
-          runGenerator(gen);
+    api['generator'] = function(tag, data){
+      var store = JSON.stringify(data);
+      generator.$cur.attr("data-" + tag, store);
+      var use = JSON.parse(store);
+      if (generator.category){
+        var category = use.shift();
+        if (rawViews.hasOwnProperty(tag)){
+          var view = rawViews[tag];
+          if (view.type == 2 && view.category == category){
+            var gen = {context: generator.context, run: view.run, 
+              $cur: generator.$cur, tag: tag, data: use, 
+              model: generator.model, category: true}
+            runGenerator(gen);
+          }
         }
       }
     }
-    api['model'] = function(tag, id, func){
+    api['model'] = function(tag, id, main, prep, post){
       var local = {};
       id = parseID(id, "write");
       function run(value){
+        if (prep){
+          prep.call(generator.context, prep)
+        }
         for(var v in value){
           if (! local.hasOwnProperty(v)){
             var $child = $("<" + tag + ">");
@@ -334,8 +366,9 @@ var chainer = function (){
             var $child = local[v].$child;
           }
           $child.empty();
-          var gen = {context: generator.context, run: func, $cur: $child,
-            tag: generator.tag, data: [], model: value[v]};
+          var gen = {context: generator.context, run: main, $cur: $child,
+            tag: generator.tag, data: [], model: value[v], 
+            category: generator.category};
           runGenerator(gen);
         }
         for(var v in local){
@@ -343,6 +376,9 @@ var chainer = function (){
             local[v].$child.remove();
             delete local[v];
           }
+        }
+        if (post){
+          post.call(generator.context, post);
         }
       }
       models[id.ns].write[id.field].refers.push({
@@ -362,7 +398,11 @@ var chainer = function (){
     var api = {};
     //Get the attribute from virtual or actual dom.
     api['attr'] = function(){
-      return modifier.data;
+      try {
+        return JSON.parse(modifier.data);
+      } catch(e){
+        return modifier.data;
+      }
     };
     //other api
     viewBasicAPI(modifier.$cur, modifier.context, api, modifier.model);
@@ -453,7 +493,9 @@ var chainer = function (){
       }
     }
     
-    $.when(load($("html"))).then(function(){
+    $.when.apply(null, initLoaders($("html"))).then(function(){
+      load($("html"));
+    
       //Updates the ready functions
       for(var r in readys){
         readys[r](elementBasicAPI($("body"), commonBasicAPI({})));
@@ -463,45 +505,41 @@ var chainer = function (){
   
   //Actions share by model and $(document).ready()
   function load($from){
-    var $deferred = $.Deferred();
     var generators = [];
     var modifiers = [];
-    //Load leaders
-    $.when.apply(null, initLoaders($from)).then(function(){
-      //Creates views
-      for(var tag in rawViews){
-        if (rawViews[tag].type == 2){
-          var raw = rawViews[tag];
-          $("[data-" + tag + "]", $from).each(function(){
-            var setup = buildData($(this).data(tag));
-            if (setup.category == raw.category){
+    //Creates views
+    for(var tag in rawViews){
+      if (rawViews[tag].type == 2){
+        var raw = rawViews[tag];
+        $("[data-" + tag + "]", $from).each(function(){
+          var setup = buildData($(this), tag);
+          if (raw.category){
+            var category = setup.shift();
+            if (category == raw.category){
               generators.push({context: {}, run: rawViews[tag].run, $cur: 
-              $(this), tag: tag, data: setup.data});
-            }
-          });
-        } else if (rawViews[tag].type == 3){
-          console.log(tag);
-          $("[data-" + tag + "]", $from).each(function(){
-            console.log(this)
-            modifiers.push({context:{}, run: rawViews[tag].run, $cur: $(this),
-              data: $(this).data(tag)});
-          });
-        }
+              $(this), tag: tag, data: setup, category: true});
+            } 
+          }
+        });
+      } else if (rawViews[tag].type == 3){
+        $("[data-" + tag + "]", $from).each(function(){
+          modifiers.push({context:{}, run: rawViews[tag].run, $cur: $(this),
+            data: $(this).attr("data-" + tag)});
+        });
       }
+    }
 
-      //Creates the html generators
-      for(var g in generators){
-        runGenerator(generators[g]);
-      }
-      
-      //creates the html modifiers
-      for(var m in modifiers){
-        runModifier(modifiers[m]);
-      }
-      $deferred.resolve();
-    });
-    return $deferred;
+    //Creates the html generators
+    for(var g in generators){
+      runGenerator(generators[g]);
+    }
+    
+    //creates the html modifiers
+    for(var m in modifiers){
+      runModifier(modifiers[m]);
+    }
   }
+  
   //PART 5: Checking Functions==================================================
   function checkNumeric(value){
     if ($.isNumeric(value)){ 
@@ -632,6 +670,12 @@ var chainer = function (){
     },
     //Creates a generator but store it for now
     'generator': function(tag, category, run){
+      if (run == null){rawViews[checkTag(tag, true)] = {
+        category: null,
+        run: checkFunction(run),
+        type: 2
+      }
+      }
       //Modifies an element from either base model or from generator
       rawViews[checkTag(tag, true)] = {
         category: checkCategory(category),
@@ -652,35 +696,8 @@ var chainer = function (){
   }
 }();
 //PART 6: std built in libary===================================================
-//PART 6.1 model================================================================
-chainer.model("std", function(init){
-  //Data for screen size
-  var options = {
-  'sm': [true, false, false],  'sm-md': [true, true, false],
-  'sm-lg': [true, false, true],'md': [false, true, false],
-  'md-sm': [true, true, false],'md-lg': [false, true, true],
-  'lg': [false, false, true],  'lg-sm': [true, false, true],
-  'lg-md': [false, true, true]
-  }
-  function media(value){
-    var type = $(window).width() < 768 
-      ? 0 : ($(window).width() < 992? 1: 2);
-    if(typeof value === 'undefined'){
-      return type == 0 ? "sm" : (type == 1? 'md' : 'lg');
-    }
-    if (options.hasOwnProperty(value)){
-      return options[value][type];
-    }
-    return value;
-  }
-  init.write("media", media);
-  $(window).resize(function(){
-    init.write("media", media);
-  })
-  //TODO more to come
-})
 
-//6.2 views=====================================================================
+//6.1 views=====================================================================
 //load file directly from the attribute
 chainer.loader("std-load", function(init){
   init.pathFromHTML();
@@ -691,53 +708,6 @@ chainer.loader("std-frame", function(init){
   init.pathFromModel();
 });
 
-//makes the panel collapse by clicking
-chainer.generator("std-collapse", "heading", function(run){
-  var collapse = null;
-  run.find("panel", function(child){
-    if (collapse == null){
-      collapse = run.data(false);
-    }
-    if (collapse){
-      $(child.get()).hide();
-    }
-  });
-  $(run.get()).click(function(){
-    run.find("panel", function(child){
-      $(child.get()).toggle();
-    });
-  })
-});
-
-//creates a css grid with lots of options
-chainer.generator("std-grid", "row", function(run){
-  var cols = run.data(1);
-  var mobile = run.data("") == "mobile";
-  var size = 0;
-  var $rest = null;
-  run.children("col", function(edit){
-    var span = edit.data(1);
-    var $edit = $(edit.get());
-    edit.recieve("std.media", function(refer){
-      var cal = span;
-      var refer = refer();
-      if (typeof span === "object"){
-        cal = span.hasOwnProperty(refer)? span[refer]:1;
-      }
-      var width = "96%";
-      if (refer != 'sm' || mobile){
-        width = ((100 / cols) * cal) - 2 + "%";
-    }
-    $edit.css("width", width);
-    });
-    $edit.css("float", "left").css("min-heigth", "1px")
-      .css("box-sizing", "border-box").css("margin", "0 1%");
-  })
-  run.append("br", function(br){
-    $(br.get()).css("clear", "both");
-  })
-});
-
 //creates a modifier that read from the model
 chainer.modifier("std-write", function(init){
   init.recieve(init.attr(), function(refer){
@@ -745,29 +715,10 @@ chainer.modifier("std-write", function(init){
   });
 })
 
-//adds a click function to a element
-chainer.modifier("std-click", function(init){
-  //TODO checking of data is needed
-  var data = init.attr();
-  //Things needed for click 
-  var calls = data.shift(); //which model read field to call
-  var enable = data.shift(); //check if the button is enable or not
-  var arg = data.length > 0? data.shift() : null; //arguments for the call
-  
-  var $init = $(init.get());
-  //set enabled
-  if (typeof enable == "boolean"){
-    $init.prop("disabled", ! enable);
-  } else {
-    init.recieve(enable, function(refer){
-      $init.prop("disabled", ! refer);
-    });
-  }
-  console.log($init.get());
-  //set click function
-  $init.click(function(){
-    console.log("hello");
-    init.update(calls, arg);
+chainer.modifier("std-read", function(modifier){
+  var attr = modifier.attr();
+  $(modifier.get()).change(function(){
+    modifier.update(attr, $(modifier.get()).val());
   })
+  modifier.update(attr, $(modifier.get()).val());
 })
-
