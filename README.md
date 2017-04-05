@@ -66,7 +66,7 @@ Child init and run function calls recusively with the same functions.
 
 ### Modifier
 This is a simple presenter with two parameters: a unique tag name and run function. It comes with these functions
-* `attr` gets the data from either it's `data-*` attribute or from virtual attribute
+* `attr()` gets the data from either it's `data-*` attribute or from virtual attribute
 * `update(id, value)` inform a model that one of its field has been updated.
 * `get()` gets the underlining HTML tag. In the future, this HTML tag can be deleted.
 
