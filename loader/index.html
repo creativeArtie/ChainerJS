@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <script src="../chainer.js"></script>
   <style>div{border:1px solid;}div + div{margin-top: 1em;}</style>
+  <title>Basic Features Example</title>
   <script>
     chainer.model("test", function(model){
       model.write("text1", "Hello");
@@ -20,7 +21,7 @@
     })
   </script>
   <body>
-    <button data-click="">Update</button>
+    <button data-click="">Update the second frame</button>
     <span std-write="test.text1"></span>
     <span data-std-write="test.text2"></span>
     <div data-std-load="page1.html"></div>
