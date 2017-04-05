@@ -2,7 +2,14 @@
 ## Overview:
 ChainerJS is a Javascript MVP framework. The framework is currently is in working alpha but many of its functionarities are not implmented and have not been test thoroughly. The article below show what I have desgined and some of it is not implemented.
 
-ChainerJS requires [JQuery](https://jquery.com/), but there will be a milestone to stop depending on it.
+ChainerJS requires [JQuery](https://jquery.com/), but hopefully there will be a milestone to stop depending on it.
+
+There are some example usage stored on here:
+1. [ChainerJS mix with AngularJS](angular): ChainerJS and AngularJS communcating to each other
+2. [Loader and Basic](loader): Loading a pages into the div elements
+3. [Loading tabs](loadtab): Using JQuery UI download from [it's download page](http://jqueryui.com/download/) to create the tabs using elements loaded by ChainerJS
+4. [Modifly and Delete](modiferDelete): Editing and deleting data
+
 ### Why Use ChainerJS?
 * *ChainerJS is easy to learn*: There are very few methods in the core framework and they are uses the same syntax. You can and will directly manipiate the DOM inside the presenters. The presenters have clear define purpose: loaders loads HTML files, generators generates more presenters, and modifiers do simple DOM manipulation. In the future, there is also a way to quickly and easily communicate to the server.
 * *ChainerJS is reflexiable.*: ChainerJS works only with the elements that have customized attributes and `data-` attributes that matches it's presenters' name. You can modify, move or even delete an element without do anything special with ChainerJS. This allows things like using [AngularJS with ChainerJS](angular). 
