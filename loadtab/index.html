@@ -1,1 +1,26 @@
-
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Adding JQuery UI Example</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+    <script src="jquery-ui-1.12.1.custom/jquery-ui.min.js"></script>
+    <script src="../chainer.js"></script>
+    <!-- minified CSS -->
+    <link rel="stylesheet"  href="jquery-ui-1.12.1.custom/jquery-ui.min.css">
+    <link rel="stylesheet"  href="jquery-ui-1.12.1.custom/jquery-ui.structure.min.css">
+    <link rel="stylesheet"  href="jquery-ui-1.12.1.custom/jquery-ui.theme.min.css">
+    
+  <script>
+    chainer.system(function(system){
+      system.ready(function(){
+        $("#tabs").tabs();
+      });
+    });
+  </script>
+  </head>
+  <body>
+    <div id="script"></div>
+    <div std-load="tab.html"></div>
+  </body>
+ </html>
