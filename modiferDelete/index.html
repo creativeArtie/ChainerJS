@@ -2,11 +2,12 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>Model Write Remove</title>
+    <title>Model Write Remove Example</title>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
     <script src="../chainer.js"></script>
   </head>
   <body>
+    <button data-remove="">Remove and Update</button>
     <p class="setRemove" std-write="test.show"></p>
     <p std-write="test.show"></p>
     <p class="setRemove" std-write="test.show"></p>
@@ -15,19 +16,16 @@
   </body>
   <script>
     chainer.model("test", function(model){
-      model.write("show","Hello World");
+      model.write("show","Test");
       model.read("update", function(value){
         model.write("show", value);
-      })
-    });
-    chainer.system(function(system){
-      system.ready(function(ready){
-        $(".setRemove").remove();
-        //Check add a line in chainer.js' write method
-        ready.update("test.update", "HelloWorld");
-        ready.update("test.update", "Hello Worlds!!!!!!!!");
-        
       });
-    })
+    });
+    chainer.modifier("remove", function(modifier){
+      $(modifier.get()).click(function(){
+        $(".setRemove").remove(); // modifiers are set to be destory automatically
+        modifier.update("test.update", "Hello Worlds!!!!!!!!");
+      });
+    });
   </script>
 </html>
