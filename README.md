@@ -7,7 +7,7 @@ ChainerJS requires [JQuery](https://jquery.com/), but hopefully there will be a 
 There are some example usage stored on here:
 1. [ChainerJS mix with AngularJS](angular): ChainerJS and AngularJS communcating to each other
 2. [Loader and Basic](loader): Loading a pages into the div elements
-3. [Loading tabs](loadtab): Using JQuery UI download from [it's download page](http://jqueryui.com/download/) to create the tabs using elements loaded by ChainerJS
+3. [Loading tabs](loadtab): Using tabs from [JQuery UI](http://jqueryui.com/download/) and using Chainer JS to load external files
 4. [Modifly and Delete](modiferDelete): Editing and deleting data
 
 ### Why Use ChainerJS?
